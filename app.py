@@ -1,9 +1,8 @@
 import os
-import io
 import streamlit as st
 import google.generativeai as genai
 from dotenv import load_dotenv
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image
 
 load_dotenv()
 
@@ -22,86 +21,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-
-def create_thumbnail(image, store_name, store_location=""):
-    """업로드된 사진으로 블로그 썸네일 생성"""
-    # 썸네일 크기 (16:9 비율)
-    width, height = 1280, 720
-    thumb = image.copy().resize((width, height), Image.LANCZOS)
-
-    # 어둡게 오버레이
-    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 140))
-    thumb = thumb.convert("RGBA")
-    thumb = Image.alpha_composite(thumb, overlay)
-
-    draw = ImageDraw.Draw(thumb)
-
-    # 폰트 설정 (시스템 폰트 사용 시도)
-    font_paths = [
-        "C:/Windows/Fonts/malgunbd.ttf",     # 맑은 고딕 Bold
-        "C:/Windows/Fonts/malgun.ttf",        # 맑은 고딕
-        "/usr/share/fonts/truetype/noto/NotoSansKR-Bold.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-    ]
-
-    title_font = None
-    sub_font = None
-    for fp in font_paths:
-        try:
-            title_font = ImageFont.truetype(fp, 72)
-            sub_font = ImageFont.truetype(fp, 36)
-            break
-        except (OSError, IOError):
-            continue
-
-    if title_font is None:
-        title_font = ImageFont.load_default()
-        sub_font = ImageFont.load_default()
-
-    # 상단 라벨
-    label = "맛집 리뷰"
-    label_bbox = draw.textbbox((0, 0), label, font=sub_font)
-    label_w = label_bbox[2] - label_bbox[0]
-    label_x = (width - label_w) // 2
-    label_y = 200
-
-    # 라벨 배경 (주황색 바)
-    pad = 16
-    draw.rounded_rectangle(
-        [label_x - pad * 2, label_y - pad, label_x + label_w + pad * 2, label_y + (label_bbox[3] - label_bbox[1]) + pad],
-        radius=8, fill=(255, 120, 30, 220)
-    )
-    draw.text((label_x, label_y), label, fill="white", font=sub_font)
-
-    # 가게 이름 (가운데)
-    title_bbox = draw.textbbox((0, 0), store_name, font=title_font)
-    title_w = title_bbox[2] - title_bbox[0]
-    title_x = (width - title_w) // 2
-    title_y = 300
-
-    # 텍스트 그림자
-    draw.text((title_x + 3, title_y + 3), store_name, fill=(0, 0, 0, 180), font=title_font)
-    draw.text((title_x, title_y), store_name, fill="white", font=title_font)
-
-    # 위치 정보
-    if store_location:
-        loc_text = f"📍 {store_location}"
-        loc_bbox = draw.textbbox((0, 0), loc_text, font=sub_font)
-        loc_w = loc_bbox[2] - loc_bbox[0]
-        loc_x = (width - loc_w) // 2
-        loc_y = 420
-        draw.text((loc_x, loc_y), loc_text, fill=(255, 255, 255, 220), font=sub_font)
-
-    # 하단 구분선
-    line_y = 520
-    line_w = 120
-    draw.rounded_rectangle(
-        [(width // 2 - line_w, line_y), (width // 2 + line_w, line_y + 4)],
-        radius=2, fill=(255, 120, 30, 200)
-    )
-
-    return thumb.convert("RGB")
 
 
 # --- 사이드바: API 키 ---
@@ -191,23 +110,6 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                 response = model.generate_content([prompt] + images)
                 result = response.text
 
-                # --- 썸네일 생성 ---
-                st.divider()
-                st.subheader("🖼️ 썸네일")
-                thumbnail = create_thumbnail(images[0], store_name, store_location)
-                st.image(thumbnail, use_container_width=True)
-
-                # 썸네일 다운로드
-                buf = io.BytesIO()
-                thumbnail.save(buf, format="JPEG", quality=95)
-                st.download_button(
-                    label="썸네일 다운로드",
-                    data=buf.getvalue(),
-                    file_name=f"{store_name}_썸네일.jpg",
-                    mime="image/jpeg",
-                )
-
-                # --- 블로그 글 ---
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")
                 st.markdown(f'<div class="blog-output">{result}</div>', unsafe_allow_html=True)
