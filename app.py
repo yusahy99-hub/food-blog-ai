@@ -1,8 +1,8 @@
 import os
+import base64
 import streamlit as st
-import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
-from PIL import Image
 
 load_dotenv()
 
@@ -26,9 +26,13 @@ st.markdown("""
 # --- 사이드바: API 키 ---
 with st.sidebar:
     st.header("설정")
-    default_key = os.environ.get("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY", "")
-    api_key = st.text_input("Google Gemini API Key", value=default_key, type="password",
-                            help="aistudio.google.com/apikey 에서 발급받으세요")
+    default_key = os.environ.get("GROQ_API_KEY", "")
+    try:
+        default_key = default_key or st.secrets.get("GROQ_API_KEY", "")
+    except Exception:
+        pass
+    api_key = st.text_input("Groq API Key", value=default_key, type="password",
+                            help="console.groq.com에서 무료 발급받으세요")
 
     st.divider()
     st.subheader("글 스타일")
@@ -69,11 +73,18 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
     elif not store_name:
         st.error("가게 이름을 입력해주세요.")
     else:
-        # 이미지를 PIL로 변환
-        images = []
+        # 이미지를 base64로 변환
+        image_contents = []
         for file in uploaded_files:
             file.seek(0)
-            images.append(Image.open(file))
+            data = base64.standard_b64encode(file.read()).decode("utf-8")
+            media_type = file.type or "image/jpeg"
+            image_contents.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media_type};base64,{data}",
+                },
+            })
 
         length_guide = {
             "짧게 (SNS용)": "300자 내외로 짧고 임팩트 있게",
@@ -103,12 +114,19 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
 - 한국 맛집 블로그 특유의 생동감 있는 문체 사용
 """
 
+        messages_content = image_contents + [{"type": "text", "text": prompt}]
+
         with st.spinner("블로그 글을 작성 중입니다..."):
             try:
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-2.0-flash")
-                response = model.generate_content([prompt] + images)
-                result = response.text
+                client = Groq(api_key=api_key)
+                response = client.chat.completions.create(
+                    model="meta-llama/llama-4-scout-17b-16e-instruct",
+                    messages=[
+                        {"role": "user", "content": messages_content}
+                    ],
+                    max_tokens=4096,
+                )
+                result = response.choices[0].message.content
 
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")
