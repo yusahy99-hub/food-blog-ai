@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import anthropic
 import base64
@@ -24,7 +25,8 @@ st.markdown("""
 # --- 사이드바: API 키 ---
 with st.sidebar:
     st.header("설정")
-    api_key = st.text_input("Anthropic API Key", type="password",
+    default_key = os.environ.get("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY", "")
+    api_key = st.text_input("Anthropic API Key", value=default_key, type="password",
                             help="console.anthropic.com에서 발급받으세요")
 
     st.divider()
