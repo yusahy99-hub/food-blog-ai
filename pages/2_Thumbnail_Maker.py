@@ -15,29 +15,34 @@ st.markdown("""
 st.title("🖼️ 썸네일 만들기")
 st.caption("사진 + 가게 정보를 넣으면 블로그 썸네일을 자동 생성합니다!")
 
-# --- 폰트 다운로드 & 캐싱 ---
-FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf"
-FONT_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".font_cache")
-
-
 @st.cache_resource
 def get_font_path():
-    """한글 폰트 확보"""
-    # Windows
-    if os.path.exists("C:/Windows/Fonts/malgunbd.ttf"):
-        return "C:/Windows/Fonts/malgunbd.ttf"
-    # 프로젝트 내
-    for p in [
+    """한글 폰트 확보 - 모든 환경 대응"""
+    import glob
+    candidates = [
+        # Windows
+        "C:/Windows/Fonts/malgunbd.ttf",
+        "C:/Windows/Fonts/malgun.ttf",
+        # Streamlit Cloud (packages.txt로 설치됨)
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        # 프로젝트 내
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "NotoSansKR-Bold.ttf"),
-    ]:
+    ]
+    for p in candidates:
         if os.path.exists(p):
             return p
-    # 다운로드
-    os.makedirs(FONT_CACHE, exist_ok=True)
-    fp = os.path.join(FONT_CACHE, "NotoSansKR-Bold.ttf")
+    # glob으로 noto cjk 폰트 찾기
+    found = glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    if found:
+        return found[0]
+    # 최후의 수단: 다운로드
+    import tempfile
+    fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
     if not os.path.exists(fp):
-        urllib.request.urlretrieve(FONT_URL, fp)
+        urllib.request.urlretrieve(
+            "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp
+        )
     return fp
 
 
