@@ -402,38 +402,174 @@ def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, rot=0, size=
     return funcs[tpl](url, name, loc, sub, accent, tc, size, sc, fid, fname, S, rot)
 
 
-@st.cache_resource
-def _install_playwright():
-    """playwright 브라우저 설치 (최초 1회)"""
-    import subprocess
-    subprocess.run(["playwright", "install", "chromium"], capture_output=True)
-    return True
+def _pil_render(pil_img, name, loc, sub, accent, tc, tpl, S):
+    """PIL로 썸네일 PNG 생성 - 템플릿별 대응"""
+    import os, glob, urllib.request
+    from PIL import ImageDraw, ImageFont, ImageFilter
 
+    W, H = 1080, 1080
 
-def _render_html_to_png(html_str, width=1080, height=1080):
-    """playwright로 HTML을 PNG 이미지로 변환"""
-    import tempfile
-    from playwright.sync_api import sync_playwright
+    # 중앙 크롭
+    iw, ih = pil_img.size
+    ratio = max(W / iw, H / ih)
+    pil_img = pil_img.resize((int(iw * ratio), int(ih * ratio)), Image.LANCZOS)
+    nw, nh = pil_img.size
+    left, top = (nw - W) // 2, (nh - H) // 2
+    canvas = pil_img.crop((left, top, left + W, top + H)).convert("RGBA")
 
-    _install_playwright()
+    # 폰트
+    font_paths = [
+        "C:/Windows/Fonts/malgunbd.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
+    ]
+    font_paths += glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    fp = None
+    for p in font_paths:
+        if os.path.exists(p):
+            fp = p
+            break
+    if not fp:
+        import tempfile
+        fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
+        if not os.path.exists(fp):
+            urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
 
-    with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
-        f.write(html_str)
-        tmp_path = f.name
+    def font(size):
+        try: return ImageFont.truetype(fp, size)
+        except: return ImageFont.load_default()
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": width + 40, "height": height + 40})
-        page.goto(f"file://{tmp_path}")
-        page.wait_for_timeout(1500)
+    nf = font(S["name"] * 2)
+    sf = font(S["sub"] * 2)
+    tf = font(S["tag"] * 2)
 
-        el = page.query_selector(".card") or page.query_selector(".wrap") or page.query_selector("body > *:first-child")
-        png_bytes = el.screenshot() if el else page.screenshot()
-        browser.close()
+    def hex_to_rgba(h, a=255):
+        h = h.lstrip("#")
+        if len(h) == 3: h = h[0]*2+h[1]*2+h[2]*2
+        return (int(h[0:2],16), int(h[1:4][:2],16), int(h[4:6],16), a)
 
-    import os
-    os.unlink(tmp_path)
-    return png_bytes
+    tc_rgb = hex_to_rgba(tc)
+    ac_rgb = hex_to_rgba(accent)
+    is_w = accent.upper() in ("#FFFFFF","#FFF")
+
+    if tpl in ("modern", "magazine", "cinematic"):
+        # 하단 그라데이션
+        ov = Image.new("RGBA", (W, H), (0,0,0,0))
+        od = ImageDraw.Draw(ov)
+        for y in range(H//3, H):
+            a = int(230*((y-H//3)/(H-H//3))**1.2)
+            od.line([(0,y),(W,y)], fill=(0,0,0,min(a,230)))
+        canvas = Image.alpha_composite(canvas, ov)
+    elif tpl in ("center", "frame", "neon", "typo"):
+        # 전체 어둡게
+        ov = Image.new("RGBA", (W,H), (0,0,0,120 if tpl!="neon" else 160))
+        canvas = Image.alpha_composite(canvas, ov)
+    elif tpl == "minimal":
+        pass  # 하단 바로 처리
+    elif tpl == "split":
+        pass  # 하단 흰 영역
+    elif tpl == "polaroid":
+        bg = Image.new("RGBA",(W,H),(240,237,232,255))
+        pad, bot_pad = 48, 160
+        img_w, img_h = W-pad*2-80, int((W-pad*2-80)*0.78)
+        inner = canvas.resize((img_w, img_h), Image.LANCZOS)
+        card_w, card_h = img_w+pad*2, img_h+pad+bot_pad
+        cx, cy = (W-card_w)//2, (H-card_h)//2
+        bg.paste(Image.new("RGBA",(card_w,card_h),(255,255,255,255)), (cx,cy))
+        bg.paste(inner, (cx+pad, cy+pad))
+        canvas = bg
+
+    draw = ImageDraw.Draw(canvas)
+    ml = 80
+
+    if tpl == "modern":
+        bottom = H - 100
+        # 꺾쇠
+        if loc:
+            tb = draw.textbbox((0,0),loc,font=tf)
+            tw,th = tb[2]-tb[0], tb[3]-tb[1]
+            tag_y = bottom - S["name"]*2 - (S["sub"]*2+40 if sub else 10) - th - 50
+            draw.rounded_rectangle([ml,tag_y,ml+tw+48,tag_y+th+28], radius=10, fill=ac_rgb)
+            draw.text((ml+24, tag_y+14), loc, fill=(34,34,34,255) if is_w else (255,255,255,255), font=tf)
+            bx,by = ml-20, tag_y-25
+            draw.line([(bx,by+50),(bx,by)], fill=(*tc_rgb[:3],120), width=4)
+            draw.line([(bx,by),(bx+50,by)], fill=(*tc_rgb[:3],120), width=4)
+        if sub:
+            draw.text((ml, bottom-S["name"]*2-S["sub"]*2-20), sub, fill=(*tc_rgb[:3],200), font=sf)
+        draw.text((ml+3, bottom-S["name"]*2+3), name, fill=(0,0,0,160), font=nf)
+        draw.text((ml, bottom-S["name"]*2), name, fill=tc_rgb, font=nf)
+
+    elif tpl == "center":
+        nb = draw.textbbox((0,0),name,font=nf)
+        nw2 = nb[2]-nb[0]
+        ny = (H - S["name"]*2)//2
+        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
+        if sub:
+            sb2 = draw.textbbox((0,0),sub,font=sf)
+            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+20), sub, fill=(*tc_rgb[:3],200), font=sf)
+        if loc:
+            tb2 = draw.textbbox((0,0),loc,font=tf)
+            tw2 = tb2[2]-tb2[0]
+            th2 = tb2[3]-tb2[1]
+            tx = (W-tw2-48)//2
+            draw.rounded_rectangle([tx, ny-th2-50, tx+tw2+48, ny-22], radius=20, outline=(*ac_rgb[:3],200), width=3)
+            draw.text((tx+24, ny-th2-36), loc, fill=tc_rgb, font=tf)
+        # 상하 라인
+        lw = 50
+        draw.rounded_rectangle([(W-lw)//2, ny-80, (W+lw)//2, ny-77], radius=2, fill=ac_rgb)
+        draw.rounded_rectangle([(W-lw)//2, ny+S["name"]*2+(60 if sub else 30), (W+lw)//2, ny+S["name"]*2+(63 if sub else 33)], radius=2, fill=ac_rgb)
+
+    elif tpl == "minimal":
+        bar_h = 140
+        bar = Image.new("RGBA",(W,bar_h),(0,0,0,210))
+        canvas.paste(bar, (0, H-bar_h), bar)
+        draw = ImageDraw.Draw(canvas)
+        draw.line([(0,H-bar_h),(W,H-bar_h)], fill=ac_rgb, width=3)
+        draw.text((60, H-bar_h+30), name, fill=tc_rgb, font=nf)
+        meta_y = H-bar_h+30+S["name"]*2+10
+        if loc:
+            draw.text((60, meta_y), loc, fill=ac_rgb, font=tf)
+        if loc and sub:
+            lw2 = draw.textbbox((0,0),loc,font=tf)[2]-draw.textbbox((0,0),loc,font=tf)[0]
+            draw.text((60+lw2+15, meta_y), "·", fill=(255,255,255,80), font=tf)
+            draw.text((60+lw2+30, meta_y), sub, fill=(*tc_rgb[:3],180), font=sf)
+        elif sub:
+            draw.text((60, meta_y), sub, fill=(*tc_rgb[:3],180), font=sf)
+
+    elif tpl == "split":
+        # 하단 흰 영역
+        bar_h = 180
+        canvas_rgb = canvas.convert("RGB")
+        white = Image.new("RGB",(W,bar_h),(255,255,255))
+        canvas_rgb.paste(white, (0,H-bar_h))
+        draw2 = ImageDraw.Draw(canvas_rgb)
+        draw2.line([(0,H-bar_h),(W,H-bar_h)], fill=ac_rgb[:3], width=4)
+        draw2.text((60, H-bar_h+30), name, fill=(26,26,26), font=nf)
+        meta_y = H-bar_h+30+S["name"]*2+10
+        if loc:
+            draw2.text((60, meta_y), f"📍 {loc}", fill=ac_rgb[:3], font=tf)
+        if loc and sub:
+            lw3 = draw2.textbbox((0,0),f"📍 {loc}",font=tf)[2]
+            draw2.text((lw3+80, meta_y), sub, fill=(102,102,102), font=sf)
+        elif sub:
+            draw2.text((60, meta_y), sub, fill=(102,102,102), font=sf)
+        return canvas_rgb
+
+    else:
+        # 나머지 템플릿: 기본 모던 스타일로 대체
+        bottom = H - 100
+        if loc:
+            tb = draw.textbbox((0,0),loc,font=tf)
+            tw,th = tb[2]-tb[0], tb[3]-tb[1]
+            tag_y = bottom - S["name"]*2 - (S["sub"]*2+40 if sub else 10) - th - 50
+            draw.rounded_rectangle([ml,tag_y,ml+tw+48,tag_y+th+28], radius=10, fill=ac_rgb)
+            draw.text((ml+24, tag_y+14), loc, fill=(34,34,34,255) if is_w else (255,255,255,255), font=tf)
+        if sub:
+            draw.text((ml, bottom-S["name"]*2-S["sub"]*2-20), sub, fill=(*tc_rgb[:3],200), font=sf)
+        draw.text((ml+3, bottom-S["name"]*2+3), name, fill=(0,0,0,160), font=nf)
+        draw.text((ml, bottom-S["name"]*2), name, fill=tc_rgb, font=nf)
+
+    return canvas.convert("RGB")
 
 
 if uploaded_file and store_name:
@@ -453,20 +589,14 @@ if uploaded_file and store_name:
     components.html(preview, height=560, scrolling=False)
 
     safe_name = store_name.replace('"', '').replace("'", "")
+    thumb = _pil_render(pil_img, store_name, store_location, subtitle, accent, text_c, template, sizes)
+    dl_buf = io.BytesIO()
+    thumb.save(dl_buf, format="PNG")
 
-    if st.button("📥 썸네일 다운로드 (PNG)", type="primary", use_container_width=True):
-        with st.spinner("이미지 생성 중..."):
-            try:
-                download_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 1080)
-                png_data = _render_html_to_png(download_html)
-                st.download_button(
-                    label="💾 저장",
-                    data=png_data,
-                    file_name=f"{safe_name}_썸네일.png",
-                    mime="image/png",
-                    use_container_width=True,
-                )
-                st.success("생성 완료! 위 저장 버튼을 눌러주세요.")
-            except Exception as e:
-                st.error(f"오류: {e}")
-                st.info("playwright가 설치되지 않은 환경입니다. 로컬에서 `pip install playwright && playwright install chromium` 실행 후 다시 시도해주세요.")
+    st.download_button(
+        label="📥 썸네일 다운로드 (PNG)",
+        data=dl_buf.getvalue(),
+        file_name=f"{safe_name}_썸네일.png",
+        mime="image/png",
+        use_container_width=True,
+    )
