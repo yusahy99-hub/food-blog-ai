@@ -390,55 +390,75 @@ if uploaded_file and store_name:
     img_url = f"data:{media_type};base64,{img_data}"
 
     st.divider()
-    st.subheader("미리보기")
+    st.subheader("미리보기 & 다운로드")
 
-    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 540)
-    components.html(preview, height=560, scrolling=False)
-
-    # 이미지 다운로드 (html2canvas로 브라우저에서 PNG 변환)
-    download_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
+    # 미리보기 + 다운로드 버튼을 하나의 컴포넌트로
+    inner_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
     safe_name = store_name.replace('"', '').replace("'", "")
 
-    download_component = f"""
+    combined = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family={font_id}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:sans-serif;background:transparent;display:flex;flex-direction:column;align-items:center}}
+body{{background:transparent;display:flex;flex-direction:column;align-items:center}}
+#thumb-container{{width:1080px;height:1080px;transform-origin:top left;}}
 .dl-btn{{
-    margin-top:12px;padding:12px 0;width:100%;max-width:540px;
+    margin-top:16px;padding:14px 0;width:540px;
     background:linear-gradient(135deg,#FF6B35,#FF4F6F);color:#fff;
     border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;
-    font-family:'Noto Sans KR',sans-serif;
 }}
 .dl-btn:hover{{opacity:0.9}}
-#render-area{{position:absolute;left:-9999px;top:0}}
 </style>
 </head><body>
+<div id="thumb-wrapper" style="width:540px;height:540px;overflow:hidden;">
+<div id="thumb-container" style="transform:scale(0.5);">
+</div>
+</div>
 <button class="dl-btn" onclick="downloadImage()">이미지로 다운로드 (PNG)</button>
-<div id="render-area"></div>
 <script>
+var thumbHTML = `{inner_html.replace(chr(96), "").replace(chr(10), " ")}`;
+// body 내용만 추출
+var bodyMatch = thumbHTML.match(/<body[^>]*>([\\ s\\S]*?)<\\/body>/i);
+var styleMatch = thumbHTML.match(/<style[^>]*>([\\ s\\S]*?)<\\/style>/i);
+
+if (styleMatch) {{
+    var s = document.createElement('style');
+    s.textContent = styleMatch[1];
+    document.head.appendChild(s);
+}}
+if (bodyMatch) {{
+    document.getElementById('thumb-container').innerHTML = bodyMatch[1];
+}}
+
 function downloadImage() {{
     var btn = document.querySelector('.dl-btn');
     btn.textContent = '생성 중...';
     btn.disabled = true;
 
-    var container = document.getElementById('render-area');
-    container.innerHTML = `{download_html.replace('`', '').replace(chr(10), ' ')}`;
+    var container = document.getElementById('thumb-container');
+    // 캡처 시 원본 크기로 복원
+    container.style.transform = 'scale(1)';
+    container.parentElement.style.width = '1080px';
+    container.parentElement.style.height = '1080px';
+    container.parentElement.style.overflow = 'visible';
 
-    // 폰트 로딩 대기
     setTimeout(function() {{
-        var target = container.querySelector('.card') || container.querySelector('.wrap') || container.firstElementChild;
-        if (!target) {{ btn.textContent = '오류 발생'; return; }}
-
-        html2canvas(target, {{
+        html2canvas(container, {{
             scale: 1,
             useCORS: true,
             allowTaint: true,
             backgroundColor: null,
-            width: target.offsetWidth,
-            height: target.offsetHeight,
+            width: 1080,
+            height: 1080,
         }}).then(function(canvas) {{
+            // 다시 축소
+            container.style.transform = 'scale(0.5)';
+            container.parentElement.style.width = '540px';
+            container.parentElement.style.height = '540px';
+            container.parentElement.style.overflow = 'hidden';
+
             var link = document.createElement('a');
             link.download = '{safe_name}_썸네일.png';
             link.href = canvas.toDataURL('image/png');
@@ -446,12 +466,16 @@ function downloadImage() {{
             btn.textContent = '이미지로 다운로드 (PNG)';
             btn.disabled = false;
         }}).catch(function(err) {{
-            btn.textContent = '다시 시도해주세요';
+            container.style.transform = 'scale(0.5)';
+            container.parentElement.style.width = '540px';
+            container.parentElement.style.height = '540px';
+            container.parentElement.style.overflow = 'hidden';
+            btn.textContent = '다시 시도';
             btn.disabled = false;
         }});
-    }}, 1500);
+    }}, 500);
 }}
 </script>
 </body></html>"""
 
-    components.html(download_component, height=60, scrolling=False)
+    components.html(combined, height=610, scrolling=False)
