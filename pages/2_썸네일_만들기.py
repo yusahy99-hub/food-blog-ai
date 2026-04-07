@@ -402,258 +402,23 @@ def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, rot=0, size=
     return funcs[tpl](url, name, loc, sub, accent, tc, size, sc, fid, fname, S, rot)
 
 
-def _pil_render(pil_img, name, loc, sub, accent, tc, tpl, S):
-    """PIL로 썸네일 PNG 생성 - 템플릿별 대응"""
-    import os, glob, urllib.request
-    from PIL import ImageDraw, ImageFont, ImageFilter
+def _html_to_png(html_str):
+    """imgkit으로 HTML → PNG 변환 (미리보기와 100% 동일)"""
+    import imgkit
+    import tempfile
 
-    W, H = 1080, 1080
+    options = {
+        "format": "png",
+        "width": "1080",
+        "height": "1080",
+        "quality": "100",
+        "enable-local-file-access": "",
+        "no-stop-slow-scripts": "",
+        "quiet": "",
+    }
 
-    # 중앙 크롭
-    iw, ih = pil_img.size
-    ratio = max(W / iw, H / ih)
-    pil_img = pil_img.resize((int(iw * ratio), int(ih * ratio)), Image.LANCZOS)
-    nw, nh = pil_img.size
-    left, top = (nw - W) // 2, (nh - H) // 2
-    canvas = pil_img.crop((left, top, left + W, top + H)).convert("RGBA")
-
-    # 폰트
-    font_paths = [
-        "C:/Windows/Fonts/malgunbd.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
-    ]
-    font_paths += glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
-    fp = None
-    for p in font_paths:
-        if os.path.exists(p):
-            fp = p
-            break
-    if not fp:
-        import tempfile
-        fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
-        if not os.path.exists(fp):
-            urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
-
-    def font(size):
-        try: return ImageFont.truetype(fp, size)
-        except: return ImageFont.load_default()
-
-    nf = font(S["name"] * 2)
-    sf = font(S["sub"] * 2)
-    tf = font(S["tag"] * 2)
-
-    def hex_to_rgba(h, a=255):
-        h = h.lstrip("#")
-        if len(h) == 3: h = h[0]*2+h[1]*2+h[2]*2
-        return (int(h[0:2],16), int(h[2:4],16), int(h[4:6],16), a)
-
-    tc_rgb = hex_to_rgba(tc)
-    ac_rgb = hex_to_rgba(accent)
-    is_w = accent.upper() in ("#FFFFFF","#FFF")
-
-    if tpl in ("modern", "magazine", "cinematic"):
-        # 하단 그라데이션
-        ov = Image.new("RGBA", (W, H), (0,0,0,0))
-        od = ImageDraw.Draw(ov)
-        for y in range(H//3, H):
-            a = int(230*((y-H//3)/(H-H//3))**1.2)
-            od.line([(0,y),(W,y)], fill=(0,0,0,min(a,230)))
-        canvas = Image.alpha_composite(canvas, ov)
-    elif tpl in ("center", "frame", "neon", "typo"):
-        # 전체 어둡게
-        ov = Image.new("RGBA", (W,H), (0,0,0,120 if tpl!="neon" else 160))
-        canvas = Image.alpha_composite(canvas, ov)
-    elif tpl == "minimal":
-        pass  # 하단 바로 처리
-    elif tpl == "split":
-        pass  # 하단 흰 영역
-    elif tpl == "polaroid":
-        bg = Image.new("RGBA",(W,H),(240,237,232,255))
-        pad, bot_pad = 48, 160
-        img_w, img_h = W-pad*2-80, int((W-pad*2-80)*0.78)
-        inner = canvas.resize((img_w, img_h), Image.LANCZOS)
-        card_w, card_h = img_w+pad*2, img_h+pad+bot_pad
-        cx, cy = (W-card_w)//2, (H-card_h)//2
-        bg.paste(Image.new("RGBA",(card_w,card_h),(255,255,255,255)), (cx,cy))
-        bg.paste(inner, (cx+pad, cy+pad))
-        canvas = bg
-
-    draw = ImageDraw.Draw(canvas)
-    ml = 80
-
-    if tpl == "modern":
-        bottom = H - 100
-        # 꺾쇠
-        if loc:
-            tb = draw.textbbox((0,0),loc,font=tf)
-            tw,th = tb[2]-tb[0], tb[3]-tb[1]
-            tag_y = bottom - S["name"]*2 - (S["sub"]*2+40 if sub else 10) - th - 50
-            draw.rounded_rectangle([ml,tag_y,ml+tw+48,tag_y+th+28], radius=10, fill=ac_rgb)
-            draw.text((ml+24, tag_y+14), loc, fill=(34,34,34,255) if is_w else (255,255,255,255), font=tf)
-            bx,by = ml-20, tag_y-25
-            draw.line([(bx,by+50),(bx,by)], fill=(*tc_rgb[:3],120), width=4)
-            draw.line([(bx,by),(bx+50,by)], fill=(*tc_rgb[:3],120), width=4)
-        if sub:
-            draw.text((ml, bottom-S["name"]*2-S["sub"]*2-20), sub, fill=(*tc_rgb[:3],200), font=sf)
-        draw.text((ml+3, bottom-S["name"]*2+3), name, fill=(0,0,0,160), font=nf)
-        draw.text((ml, bottom-S["name"]*2), name, fill=tc_rgb, font=nf)
-
-    elif tpl == "center":
-        nb = draw.textbbox((0,0),name,font=nf)
-        nw2 = nb[2]-nb[0]
-        ny = (H - S["name"]*2)//2
-        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
-        if sub:
-            sb2 = draw.textbbox((0,0),sub,font=sf)
-            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+20), sub, fill=(*tc_rgb[:3],200), font=sf)
-        if loc:
-            tb2 = draw.textbbox((0,0),loc,font=tf)
-            tw2 = tb2[2]-tb2[0]
-            th2 = tb2[3]-tb2[1]
-            tx = (W-tw2-48)//2
-            draw.rounded_rectangle([tx, ny-th2-50, tx+tw2+48, ny-22], radius=20, outline=(*ac_rgb[:3],200), width=3)
-            draw.text((tx+24, ny-th2-36), loc, fill=tc_rgb, font=tf)
-        # 상하 라인
-        lw = 50
-        draw.rounded_rectangle([(W-lw)//2, ny-80, (W+lw)//2, ny-77], radius=2, fill=ac_rgb)
-        draw.rounded_rectangle([(W-lw)//2, ny+S["name"]*2+(60 if sub else 30), (W+lw)//2, ny+S["name"]*2+(63 if sub else 33)], radius=2, fill=ac_rgb)
-
-    elif tpl == "minimal":
-        bar_h = 140
-        bar = Image.new("RGBA",(W,bar_h),(0,0,0,210))
-        canvas.paste(bar, (0, H-bar_h), bar)
-        draw = ImageDraw.Draw(canvas)
-        draw.line([(0,H-bar_h),(W,H-bar_h)], fill=ac_rgb, width=3)
-        draw.text((60, H-bar_h+30), name, fill=tc_rgb, font=nf)
-        meta_y = H-bar_h+30+S["name"]*2+10
-        if loc:
-            draw.text((60, meta_y), loc, fill=ac_rgb, font=tf)
-        if loc and sub:
-            lw2 = draw.textbbox((0,0),loc,font=tf)[2]-draw.textbbox((0,0),loc,font=tf)[0]
-            draw.text((60+lw2+15, meta_y), "·", fill=(255,255,255,80), font=tf)
-            draw.text((60+lw2+30, meta_y), sub, fill=(*tc_rgb[:3],180), font=sf)
-        elif sub:
-            draw.text((60, meta_y), sub, fill=(*tc_rgb[:3],180), font=sf)
-
-    elif tpl == "split":
-        # 하단 흰 영역
-        bar_h = 180
-        canvas_rgb = canvas.convert("RGB")
-        white = Image.new("RGB",(W,bar_h),(255,255,255))
-        canvas_rgb.paste(white, (0,H-bar_h))
-        draw2 = ImageDraw.Draw(canvas_rgb)
-        draw2.line([(0,H-bar_h),(W,H-bar_h)], fill=ac_rgb[:3], width=4)
-        draw2.text((60, H-bar_h+30), name, fill=(26,26,26), font=nf)
-        meta_y = H-bar_h+30+S["name"]*2+10
-        if loc:
-            draw2.text((60, meta_y), f"📍 {loc}", fill=ac_rgb[:3], font=tf)
-        if loc and sub:
-            lw3 = draw2.textbbox((0,0),f"📍 {loc}",font=tf)[2]
-            draw2.text((lw3+80, meta_y), sub, fill=(102,102,102), font=sf)
-        elif sub:
-            draw2.text((60, meta_y), sub, fill=(102,102,102), font=sf)
-        return canvas_rgb
-
-    elif tpl == "typo":
-        # 중앙 초대형 텍스트
-        big_font = font(int(S["name"] * 2.6))
-        nb = draw.textbbox((0,0), name, font=big_font)
-        nw2 = nb[2]-nb[0]
-        ny = (H - int(S["name"]*2.6))//2
-        draw.text(((W-nw2)//2+3, ny+3), name, fill=(0,0,0,100), font=big_font)
-        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=big_font)
-        # 라인
-        draw.rounded_rectangle([(W-60)//2, ny+int(S["name"]*2.6)+20, (W+60)//2, ny+int(S["name"]*2.6)+23], radius=2, fill=ac_rgb)
-        if sub:
-            sb2 = draw.textbbox((0,0), sub, font=sf)
-            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+int(S["name"]*2.6)+40), sub, fill=(*tc_rgb[:3],200), font=sf)
-        if loc:
-            tb2 = draw.textbbox((0,0), loc, font=tf)
-            draw.text(((W-(tb2[2]-tb2[0]))//2, ny-S["tag"]*2-30), loc, fill=ac_rgb, font=tf)
-
-    elif tpl == "magazine":
-        # 좌상단
-        top_y = 100
-        if loc:
-            draw.rounded_rectangle([ml, top_y, ml+draw.textbbox((0,0),loc,font=tf)[2]+28, top_y+S["tag"]*2+16], radius=6, fill=ac_rgb)
-            draw.text((ml+14, top_y+8), loc, fill=(255,255,255,255), font=tf)
-            top_y += S["tag"]*2 + 40
-        draw.text((ml+3, top_y+3), name, fill=(0,0,0,100), font=nf)
-        draw.text((ml, top_y), name, fill=tc_rgb, font=nf)
-        if sub:
-            sub_y = top_y + S["name"]*2 + 20
-            draw.line([(ml, sub_y), (ml, sub_y+S["sub"]*2)], fill=ac_rgb, width=3)
-            draw.text((ml+16, sub_y), sub, fill=(*tc_rgb[:3],200), font=sf)
-        # 우하단 코너
-        draw.line([(W-ml, H-ml-50), (W-ml, H-ml)], fill=(*tc_rgb[:3],90), width=3)
-        draw.line([(W-ml-50, H-ml), (W-ml, H-ml)], fill=(*tc_rgb[:3],90), width=3)
-
-    elif tpl == "neon":
-        # 중앙 네온
-        nb = draw.textbbox((0,0), name, font=nf)
-        nw2 = nb[2]-nb[0]
-        ny = (H - S["name"]*2)//2
-        # 글로우 효과 (여러번 그리기)
-        for offset in [4,3,2,1]:
-            draw.text(((W-nw2)//2, ny+offset), name, fill=(*ac_rgb[:3],40), font=nf)
-            draw.text(((W-nw2)//2, ny-offset), name, fill=(*ac_rgb[:3],40), font=nf)
-        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
-        if loc:
-            tb2 = draw.textbbox((0,0), loc, font=tf)
-            tw2 = tb2[2]-tb2[0]
-            th2 = tb2[3]-tb2[1]
-            tx = (W-tw2-48)//2
-            draw.rounded_rectangle([tx, ny-th2-50, tx+tw2+48, ny-22], radius=20, outline=ac_rgb, width=2)
-            draw.text((tx+24, ny-th2-36), loc, fill=ac_rgb, font=tf)
-        if sub:
-            sb2 = draw.textbbox((0,0), sub, font=sf)
-            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+20), sub, fill=(*tc_rgb[:3],200), font=sf)
-
-    elif tpl == "frame":
-        # 프레임 + 중앙 하단
-        draw.rounded_rectangle([56,56,W-56,H-56], radius=16, outline=(*tc_rgb[:3],100), width=2)
-        # 상단 라인
-        draw.rounded_rectangle([(W-40)//2, 104, (W+40)//2, 107], radius=2, fill=ac_rgb)
-        # 텍스트
-        nb = draw.textbbox((0,0), name, font=nf)
-        nw2 = nb[2]-nb[0]
-        ny = H - 200
-        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
-        if sub:
-            sb2 = draw.textbbox((0,0), sub, font=sf)
-            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+16), sub, fill=(*tc_rgb[:3],210), font=sf)
-        if loc:
-            tb2 = draw.textbbox((0,0), loc, font=tf)
-            tw2 = tb2[2]-tb2[0]
-            th2 = tb2[3]-tb2[1]
-            tx = (W-tw2-48)//2
-            draw.rounded_rectangle([tx, ny-th2-40, tx+tw2+48, ny-12], radius=20, outline=(*ac_rgb[:3],200), width=2)
-            draw.text((tx+24, ny-th2-26), loc, fill=tc_rgb, font=tf)
-
-    elif tpl == "cinematic":
-        # 시네마틱 바
-        bar = int(H * 0.1)
-        draw.rectangle([0,0,W,bar], fill=(0,0,0,255))
-        draw.rectangle([0,H-bar,W,H], fill=(0,0,0,255))
-        bottom = H - bar - 30
-        if loc:
-            draw.text((ml, bottom-S["name"]*2-S["tag"]*2-20), loc, fill=ac_rgb, font=tf)
-        draw.text((ml, bottom-S["name"]*2), name, fill=tc_rgb, font=nf)
-        if sub:
-            draw.text((ml, bottom+10), sub, fill=(*tc_rgb[:3],180), font=sf)
-
-    else:
-        # 폴라로이드 등 나머지
-        nb = draw.textbbox((0,0), name, font=nf)
-        nw2 = nb[2]-nb[0]
-        draw.text(((W-nw2)//2, H-160), name, fill=(50,50,50,255), font=nf)
-        if sub or loc:
-            meta = (loc + " · " if loc else "") + (sub or "")
-            sb2 = draw.textbbox((0,0), meta, font=sf)
-            draw.text(((W-(sb2[2]-sb2[0]))//2, H-100), meta, fill=(150,150,150,255), font=sf)
-
-    return canvas.convert("RGB")
+    png_bytes = imgkit.from_string(html_str, False, options=options)
+    return png_bytes
 
 
 if uploaded_file and store_name:
@@ -673,19 +438,19 @@ if uploaded_file and store_name:
     components.html(preview, height=560, scrolling=False)
 
     safe_name = store_name.replace('"', '').replace("'", "")
-    try:
-        thumb = _pil_render(pil_img.copy(), store_name, store_location, subtitle, accent, text_c, template, sizes)
-        dl_buf = io.BytesIO()
-        thumb.save(dl_buf, format="PNG")
 
-        st.download_button(
-            label="📥 썸네일 다운로드 (PNG)",
-            data=dl_buf.getvalue(),
-            file_name=f"{safe_name}_썸네일.png",
-            mime="image/png",
-            use_container_width=True,
-        )
-    except Exception as e:
-        st.error(f"이미지 생성 오류: {e}")
-        import traceback
-        st.code(traceback.format_exc())
+    if st.button("📥 썸네일 다운로드 (PNG)", type="primary", use_container_width=True):
+        with st.spinner("이미지 생성 중..."):
+            try:
+                download_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 1080)
+                png_data = _html_to_png(download_html)
+
+                st.download_button(
+                    label="💾 저장",
+                    data=png_data,
+                    file_name=f"{safe_name}_썸네일.png",
+                    mime="image/png",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"오류: {e}")
