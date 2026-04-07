@@ -52,7 +52,7 @@ with col2:
     store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처")
 
 uploaded_files = st.file_uploader(
-    "음식/공간 사진 업로드 (최대 5장)",
+    "음식/공간 사진 업로드",
     type=["jpg", "jpeg", "png", "webp"],
     accept_multiple_files=True
 )
@@ -70,18 +70,16 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
         st.error("사이드바에서 API Key를 입력해주세요.")
     elif not uploaded_files:
         st.error("사진을 최소 1장 업로드해주세요.")
-    elif len(uploaded_files) > 5:
-        st.error("사진은 최대 5장까지 업로드 가능합니다.")
     elif not store_name:
         st.error("가게 이름을 입력해주세요.")
     else:
-        # 이미지를 base64로 변환
-        image_contents = []
-        for file in uploaded_files[:5]:
+        # 이미지를 base64로 변환 (5장씩 묶어서 처리)
+        all_image_contents = []
+        for file in uploaded_files:
             file.seek(0)
             data = base64.standard_b64encode(file.read()).decode("utf-8")
             media_type = file.type or "image/jpeg"
-            image_contents.append({
+            all_image_contents.append({
                 "type": "image_url",
                 "image_url": {
                     "url": f"data:{media_type};base64,{data}",
@@ -96,7 +94,58 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
 
         location_info = f"\n- 위치: {store_location}" if store_location else ""
 
-        prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
+        with st.spinner("블로그 글을 작성 중입니다..."):
+            try:
+                client = Groq(api_key=api_key)
+
+                # 5장 초과 시: 5장씩 나눠서 각각 사진 설명을 받은 뒤 최종 글 작성
+                if len(all_image_contents) > 5:
+                    # 1단계: 5장씩 묶어서 사진 분석
+                    descriptions = []
+                    chunks = [all_image_contents[i:i+5] for i in range(0, len(all_image_contents), 5)]
+                    for idx, chunk in enumerate(chunks):
+                        analyze_prompt = f"이 사진들은 '{store_name}' 가게의 음식/공간 사진입니다. 각 사진에 보이는 음식, 재료, 플레이팅, 분위기 등을 한국어로 상세히 묘사해주세요."
+                        chunk_content = chunk + [{"type": "text", "text": analyze_prompt}]
+                        resp = client.chat.completions.create(
+                            model="meta-llama/llama-4-scout-17b-16e-instruct",
+                            messages=[{"role": "user", "content": chunk_content}],
+                            max_tokens=2048,
+                        )
+                        descriptions.append(resp.choices[0].message.content)
+
+                    # 2단계: 분석 결과를 모아서 블로그 글 작성
+                    combined = "\n\n".join(descriptions)
+                    final_prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
+아래 사진 분석 결과와 가게 정보를 바탕으로 블로그 포스팅을 작성해주세요.
+
+## 가게 정보
+- 가게 이름: {store_name}{location_info}
+
+## 사진 분석 결과
+{combined}
+
+## 작성 가이드
+- 톤: {tone} 말투로 작성
+- 분량: {length_guide[length]}
+- 자연스러운 맛집 블로그 형식 (제목, 소개, 음식 설명, 총평 포함)
+- 적절한 이모지 사용
+- 해시태그 5~10개를 마지막에 포함
+
+## 주의사항
+- 사진 분석 결과를 기반으로만 작성 (없는 내용 지어내지 않기)
+- 과장되지 않으면서도 매력적으로 표현
+- 한국 맛집 블로그 특유의 생동감 있는 문체 사용
+"""
+                    response = client.chat.completions.create(
+                        model="meta-llama/llama-4-scout-17b-16e-instruct",
+                        messages=[{"role": "user", "content": final_prompt}],
+                        max_tokens=4096,
+                    )
+                    result = response.choices[0].message.content
+
+                else:
+                    # 5장 이하: 한번에 처리
+                    prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
 아래 정보를 바탕으로 블로그 포스팅을 작성해주세요.
 
 ## 가게 정보
@@ -115,20 +164,13 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
 - 과장되지 않으면서도 매력적으로 표현
 - 한국 맛집 블로그 특유의 생동감 있는 문체 사용
 """
-
-        messages_content = image_contents + [{"type": "text", "text": prompt}]
-
-        with st.spinner("블로그 글을 작성 중입니다..."):
-            try:
-                client = Groq(api_key=api_key)
-                response = client.chat.completions.create(
-                    model="meta-llama/llama-4-scout-17b-16e-instruct",
-                    messages=[
-                        {"role": "user", "content": messages_content}
-                    ],
-                    max_tokens=4096,
-                )
-                result = response.choices[0].message.content
+                    messages_content = all_image_contents + [{"type": "text", "text": prompt}]
+                    response = client.chat.completions.create(
+                        model="meta-llama/llama-4-scout-17b-16e-instruct",
+                        messages=[{"role": "user", "content": messages_content}],
+                        max_tokens=4096,
+                    )
+                    result = response.choices[0].message.content
 
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")
