@@ -555,19 +555,103 @@ def _pil_render(pil_img, name, loc, sub, accent, tc, tpl, S):
             draw2.text((60, meta_y), sub, fill=(102,102,102), font=sf)
         return canvas_rgb
 
-    else:
-        # 나머지 템플릿: 기본 모던 스타일로 대체
-        bottom = H - 100
-        if loc:
-            tb = draw.textbbox((0,0),loc,font=tf)
-            tw,th = tb[2]-tb[0], tb[3]-tb[1]
-            tag_y = bottom - S["name"]*2 - (S["sub"]*2+40 if sub else 10) - th - 50
-            draw.rounded_rectangle([ml,tag_y,ml+tw+48,tag_y+th+28], radius=10, fill=ac_rgb)
-            draw.text((ml+24, tag_y+14), loc, fill=(34,34,34,255) if is_w else (255,255,255,255), font=tf)
+    elif tpl == "typo":
+        # 중앙 초대형 텍스트
+        big_font = font(int(S["name"] * 2.6))
+        nb = draw.textbbox((0,0), name, font=big_font)
+        nw2 = nb[2]-nb[0]
+        ny = (H - int(S["name"]*2.6))//2
+        draw.text(((W-nw2)//2+3, ny+3), name, fill=(0,0,0,100), font=big_font)
+        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=big_font)
+        # 라인
+        draw.rounded_rectangle([(W-60)//2, ny+int(S["name"]*2.6)+20, (W+60)//2, ny+int(S["name"]*2.6)+23], radius=2, fill=ac_rgb)
         if sub:
-            draw.text((ml, bottom-S["name"]*2-S["sub"]*2-20), sub, fill=(*tc_rgb[:3],200), font=sf)
-        draw.text((ml+3, bottom-S["name"]*2+3), name, fill=(0,0,0,160), font=nf)
+            sb2 = draw.textbbox((0,0), sub, font=sf)
+            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+int(S["name"]*2.6)+40), sub, fill=(*tc_rgb[:3],200), font=sf)
+        if loc:
+            tb2 = draw.textbbox((0,0), loc, font=tf)
+            draw.text(((W-(tb2[2]-tb2[0]))//2, ny-S["tag"]*2-30), loc, fill=ac_rgb, font=tf)
+
+    elif tpl == "magazine":
+        # 좌상단
+        top_y = 100
+        if loc:
+            draw.rounded_rectangle([ml, top_y, ml+draw.textbbox((0,0),loc,font=tf)[2]+28, top_y+S["tag"]*2+16], radius=6, fill=ac_rgb)
+            draw.text((ml+14, top_y+8), loc, fill=(255,255,255,255), font=tf)
+            top_y += S["tag"]*2 + 40
+        draw.text((ml+3, top_y+3), name, fill=(0,0,0,100), font=nf)
+        draw.text((ml, top_y), name, fill=tc_rgb, font=nf)
+        if sub:
+            sub_y = top_y + S["name"]*2 + 20
+            draw.line([(ml, sub_y), (ml, sub_y+S["sub"]*2)], fill=ac_rgb, width=3)
+            draw.text((ml+16, sub_y), sub, fill=(*tc_rgb[:3],200), font=sf)
+        # 우하단 코너
+        draw.line([(W-ml, H-ml-50), (W-ml, H-ml)], fill=(*tc_rgb[:3],90), width=3)
+        draw.line([(W-ml-50, H-ml), (W-ml, H-ml)], fill=(*tc_rgb[:3],90), width=3)
+
+    elif tpl == "neon":
+        # 중앙 네온
+        nb = draw.textbbox((0,0), name, font=nf)
+        nw2 = nb[2]-nb[0]
+        ny = (H - S["name"]*2)//2
+        # 글로우 효과 (여러번 그리기)
+        for offset in [4,3,2,1]:
+            draw.text(((W-nw2)//2, ny+offset), name, fill=(*ac_rgb[:3],40), font=nf)
+            draw.text(((W-nw2)//2, ny-offset), name, fill=(*ac_rgb[:3],40), font=nf)
+        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
+        if loc:
+            tb2 = draw.textbbox((0,0), loc, font=tf)
+            tw2 = tb2[2]-tb2[0]
+            th2 = tb2[3]-tb2[1]
+            tx = (W-tw2-48)//2
+            draw.rounded_rectangle([tx, ny-th2-50, tx+tw2+48, ny-22], radius=20, outline=ac_rgb, width=2)
+            draw.text((tx+24, ny-th2-36), loc, fill=ac_rgb, font=tf)
+        if sub:
+            sb2 = draw.textbbox((0,0), sub, font=sf)
+            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+20), sub, fill=(*tc_rgb[:3],200), font=sf)
+
+    elif tpl == "frame":
+        # 프레임 + 중앙 하단
+        draw.rounded_rectangle([56,56,W-56,H-56], radius=16, outline=(*tc_rgb[:3],100), width=2)
+        # 상단 라인
+        draw.rounded_rectangle([(W-40)//2, 104, (W+40)//2, 107], radius=2, fill=ac_rgb)
+        # 텍스트
+        nb = draw.textbbox((0,0), name, font=nf)
+        nw2 = nb[2]-nb[0]
+        ny = H - 200
+        draw.text(((W-nw2)//2, ny), name, fill=tc_rgb, font=nf)
+        if sub:
+            sb2 = draw.textbbox((0,0), sub, font=sf)
+            draw.text(((W-(sb2[2]-sb2[0]))//2, ny+S["name"]*2+16), sub, fill=(*tc_rgb[:3],210), font=sf)
+        if loc:
+            tb2 = draw.textbbox((0,0), loc, font=tf)
+            tw2 = tb2[2]-tb2[0]
+            th2 = tb2[3]-tb2[1]
+            tx = (W-tw2-48)//2
+            draw.rounded_rectangle([tx, ny-th2-40, tx+tw2+48, ny-12], radius=20, outline=(*ac_rgb[:3],200), width=2)
+            draw.text((tx+24, ny-th2-26), loc, fill=tc_rgb, font=tf)
+
+    elif tpl == "cinematic":
+        # 시네마틱 바
+        bar = int(H * 0.1)
+        draw.rectangle([0,0,W,bar], fill=(0,0,0,255))
+        draw.rectangle([0,H-bar,W,H], fill=(0,0,0,255))
+        bottom = H - bar - 30
+        if loc:
+            draw.text((ml, bottom-S["name"]*2-S["tag"]*2-20), loc, fill=ac_rgb, font=tf)
         draw.text((ml, bottom-S["name"]*2), name, fill=tc_rgb, font=nf)
+        if sub:
+            draw.text((ml, bottom+10), sub, fill=(*tc_rgb[:3],180), font=sf)
+
+    else:
+        # 폴라로이드 등 나머지
+        nb = draw.textbbox((0,0), name, font=nf)
+        nw2 = nb[2]-nb[0]
+        draw.text(((W-nw2)//2, H-160), name, fill=(50,50,50,255), font=nf)
+        if sub or loc:
+            meta = (loc + " · " if loc else "") + (sub or "")
+            sb2 = draw.textbbox((0,0), meta, font=sf)
+            draw.text(((W-(sb2[2]-sb2[0]))//2, H-100), meta, fill=(150,150,150,255), font=sf)
 
     return canvas.convert("RGB")
 
