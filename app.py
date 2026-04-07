@@ -8,7 +8,6 @@ load_dotenv()
 
 st.set_page_config(page_title="맛집 블로그 AI", page_icon="🍽️", layout="wide")
 
-# --- 스타일 ---
 st.markdown("""
 <style>
     .stMainBlockContainer { max-width: 900px; margin: 0 auto; }
@@ -23,19 +22,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- 사이드바: API 키 ---
-with st.sidebar:
-    st.header("설정")
-    default_key = os.environ.get("GROQ_API_KEY", "")
-    try:
-        default_key = default_key or st.secrets.get("GROQ_API_KEY", "")
-    except Exception:
-        pass
-    api_key = st.text_input("Groq API Key", value=default_key, type="password",
-                            help="console.groq.com에서 무료 발급받으세요")
+def get_api_key():
+    key = os.environ.get("GROQ_API_KEY", "")
+    if not key:
+        try:
+            key = st.secrets.get("GROQ_API_KEY", "")
+        except Exception:
+            pass
+    return key
 
-    st.divider()
-    st.subheader("글 스타일")
+
+# --- 사이드바 ---
+with st.sidebar:
+    st.header("글 스타일")
     tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"])
     length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"])
 
@@ -44,10 +43,8 @@ st.title("🍽️ 맛집 블로그 AI")
 st.caption("사진을 올리면 맛집 블로거처럼 글을 써드립니다!")
 
 col1, col2 = st.columns(2)
-
 with col1:
     store_name = st.text_input("가게 이름", placeholder="예: 을지로 골목식당")
-
 with col2:
     store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처")
 
@@ -57,7 +54,6 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-# 업로드된 사진 미리보기
 if uploaded_files:
     cols = st.columns(min(len(uploaded_files), 5))
     for i, file in enumerate(uploaded_files):
@@ -66,14 +62,14 @@ if uploaded_files:
 
 # --- 블로그 생성 ---
 if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=True):
+    api_key = get_api_key()
     if not api_key:
-        st.error("사이드바에서 API Key를 입력해주세요.")
+        st.error("API Key가 설정되지 않았습니다.")
     elif not uploaded_files:
         st.error("사진을 최소 1장 업로드해주세요.")
     elif not store_name:
         st.error("가게 이름을 입력해주세요.")
     else:
-        # 이미지를 base64로 변환 (5장씩 묶어서 처리)
         all_image_contents = []
         for file in uploaded_files:
             file.seek(0)
@@ -81,9 +77,7 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
             media_type = file.type or "image/jpeg"
             all_image_contents.append({
                 "type": "image_url",
-                "image_url": {
-                    "url": f"data:{media_type};base64,{data}",
-                },
+                "image_url": {"url": f"data:{media_type};base64,{data}"},
             })
 
         length_guide = {
@@ -98,12 +92,10 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
             try:
                 client = Groq(api_key=api_key)
 
-                # 5장 초과 시: 5장씩 나눠서 각각 사진 설명을 받은 뒤 최종 글 작성
                 if len(all_image_contents) > 5:
-                    # 1단계: 5장씩 묶어서 사진 분석
                     descriptions = []
                     chunks = [all_image_contents[i:i+5] for i in range(0, len(all_image_contents), 5)]
-                    for idx, chunk in enumerate(chunks):
+                    for chunk in chunks:
                         analyze_prompt = f"이 사진들은 '{store_name}' 가게의 음식/공간 사진입니다. 각 사진에 보이는 음식, 재료, 플레이팅, 분위기 등을 한국어로 상세히 묘사해주세요."
                         chunk_content = chunk + [{"type": "text", "text": analyze_prompt}]
                         resp = client.chat.completions.create(
@@ -113,7 +105,6 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                         )
                         descriptions.append(resp.choices[0].message.content)
 
-                    # 2단계: 분석 결과를 모아서 블로그 글 작성
                     combined = "\n\n".join(descriptions)
                     final_prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
 아래 사진 분석 결과와 가게 정보를 바탕으로 블로그 포스팅을 작성해주세요.
@@ -142,9 +133,7 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                         max_tokens=4096,
                     )
                     result = response.choices[0].message.content
-
                 else:
-                    # 5장 이하: 한번에 처리
                     prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
 아래 정보를 바탕으로 블로그 포스팅을 작성해주세요.
 
@@ -175,8 +164,6 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")
                 st.markdown(f'<div class="blog-output">{result}</div>', unsafe_allow_html=True)
-
-                # 복사 버튼
                 st.text_area("텍스트 복사용", result, height=200, label_visibility="collapsed")
 
             except Exception as e:
