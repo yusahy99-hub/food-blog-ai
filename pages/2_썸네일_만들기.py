@@ -402,10 +402,104 @@ def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, rot=0, size=
     return funcs[tpl](url, name, loc, sub, accent, tc, size, sc, fid, fname, S, rot)
 
 
+def _render_pil(pil_img, store_name, store_location, subtitle, accent, text_c, sizes):
+    """PIL로 썸네일 이미지 직접 생성 (다운로드용)"""
+    import os, glob, urllib.request
+    from PIL import ImageDraw, ImageFont
+
+    W, H = 1080, 1080
+
+    # 중앙 크롭 + 리사이즈
+    iw, ih = pil_img.size
+    ratio = max(W / iw, H / ih)
+    pil_img = pil_img.resize((int(iw * ratio), int(ih * ratio)), Image.LANCZOS)
+    nw, nh = pil_img.size
+    left, top = (nw - W) // 2, (nh - H) // 2
+    canvas = pil_img.crop((left, top, left + W, top + H)).convert("RGBA")
+
+    # 그라데이션 오버레이
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    for y in range(H // 3, H):
+        progress = (y - H // 3) / (H - H // 3)
+        alpha = int(230 * progress ** 1.2)
+        for x in range(W):
+            overlay.putpixel((x, y), (0, 0, 0, min(alpha, 230)))
+    canvas = Image.alpha_composite(canvas, overlay)
+
+    draw = ImageDraw.Draw(canvas)
+
+    # 폰트 로드
+    font_candidates = [
+        "C:/Windows/Fonts/malgunbd.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    ]
+    font_candidates += glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    font_candidates.append(os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"))
+
+    font_path = None
+    for fp in font_candidates:
+        if os.path.exists(fp):
+            font_path = fp
+            break
+
+    if not font_path:
+        import tempfile
+        font_path = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
+        if not os.path.exists(font_path):
+            urllib.request.urlretrieve(
+                "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf",
+                font_path
+            )
+
+    def load_font(size):
+        try:
+            return ImageFont.truetype(font_path, size)
+        except:
+            return ImageFont.load_default()
+
+    name_font = load_font(sizes["name"] * 2)
+    sub_font = load_font(sizes["sub"] * 2)
+    tag_font = load_font(sizes["tag"] * 2)
+
+    ml = 80
+    bottom = H - 100
+
+    # 가게 이름
+    draw.text((ml + 3, bottom - sizes["name"] * 2 + 3), store_name, fill=(0, 0, 0, 160), font=name_font)
+    draw.text((ml, bottom - sizes["name"] * 2), store_name, fill=text_c, font=name_font)
+
+    # 설명 문구
+    if subtitle:
+        sub_y = bottom - sizes["name"] * 2 - sizes["sub"] * 2 - 20
+        draw.text((ml, sub_y), subtitle, fill=text_c + "dd" if len(text_c) <= 7 else text_c, font=sub_font)
+
+    # 위치 태그
+    if store_location:
+        tag_bbox = draw.textbbox((0, 0), store_location, font=tag_font)
+        tw = tag_bbox[2] - tag_bbox[0]
+        th = tag_bbox[3] - tag_bbox[1]
+        tag_y = bottom - sizes["name"] * 2 - (sizes["sub"] * 2 + 40 if subtitle else 10) - th - 40
+        px, py = 24, 14
+
+        # 태그 배경
+        draw.rounded_rectangle(
+            [ml, tag_y, ml + tw + px * 2, tag_y + th + py * 2],
+            radius=10, fill=accent
+        )
+        tag_text_color = "#222222" if accent.upper() in ("#FFFFFF", "#FFF") else "#FFFFFF"
+        draw.text((ml + px, tag_y + py), store_location, fill=tag_text_color, font=tag_font)
+
+        # 꺾쇠 장식
+        bx, by = ml - 20, tag_y - 25
+        draw.line([(bx, by + 50), (bx, by)], fill=(255, 255, 255, 120), width=4)
+        draw.line([(bx, by), (bx + 50, by)], fill=(255, 255, 255, 120), width=4)
+
+    return canvas.convert("RGB")
+
+
 if uploaded_file and store_name:
     uploaded_file.seek(0)
     pil_img = Image.open(uploaded_file).convert("RGB")
-    # PIL로 회전 (90도 단위, expand=True로 크기 유지)
     if img_rotation:
         pil_img = pil_img.rotate(img_rotation, expand=True, resample=Image.LANCZOS)
     buf = io.BytesIO()
@@ -419,15 +513,16 @@ if uploaded_file and store_name:
     preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 540)
     components.html(preview, height=560, scrolling=False)
 
-    # 다운로드용 1080px HTML
-    download_html_raw = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 1080)
+    # PIL로 이미지 생성 → 바로 PNG 다운로드
     safe_name = store_name.replace('"', '').replace("'", "")
+    thumb_img = _render_pil(pil_img, store_name, store_location, subtitle, accent, text_c, sizes)
+    dl_buf = io.BytesIO()
+    thumb_img.save(dl_buf, format="PNG", quality=95)
 
     st.download_button(
-        label="📥 썸네일 다운로드 (HTML → 브라우저에서 열고 우클릭 저장)",
-        data=download_html_raw,
-        file_name=f"{safe_name}_썸네일.html",
-        mime="text/html",
+        label="📥 썸네일 다운로드 (PNG)",
+        data=dl_buf.getvalue(),
+        file_name=f"{safe_name}_썸네일.png",
+        mime="image/png",
         use_container_width=True,
     )
-    st.caption("다운받은 HTML 파일을 브라우저에서 열고, 이미지 위에서 우클릭 → 이미지로 저장")
