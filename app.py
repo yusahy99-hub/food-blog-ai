@@ -206,5 +206,17 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                 st.markdown("")
                 st.text_area("텍스트 복사용", result, height=200, label_visibility="collapsed")
 
+            except anthropic.BadRequestError as e:
+                if "credit" in str(e).lower() or "balance" in str(e).lower():
+                    st.error("크레딧이 부족합니다. console.anthropic.com 에서 충전해주세요.")
+                else:
+                    st.error(f"요청 오류: {e}")
+            except anthropic.AuthenticationError:
+                st.error("API Key가 유효하지 않습니다. 확인 후 다시 시도해주세요.")
+            except anthropic.RateLimitError:
+                st.error("요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.")
             except Exception as e:
-                st.error(f"오류가 발생했습니다: {e}")
+                if "credit" in str(e).lower() or "balance" in str(e).lower():
+                    st.error("크레딧이 부족합니다. console.anthropic.com 에서 충전해주세요.")
+                else:
+                    st.error(f"오류가 발생했습니다: {e}")
