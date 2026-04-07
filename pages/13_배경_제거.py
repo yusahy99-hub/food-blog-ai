@@ -2,7 +2,6 @@ import io
 import zipfile
 import streamlit as st
 from PIL import Image
-from rembg import remove
 
 st.set_page_config(page_title="배경 제거", page_icon="✂️")
 
@@ -18,6 +17,18 @@ st.markdown("""
 
 st.title("✂️ 배경 제거")
 st.caption("사진을 올리면 배경을 자동으로 제거합니다 (누끼 따기)")
+
+# rembg 설치 여부 확인
+try:
+    from rembg import remove
+    rembg_available = True
+except ImportError:
+    rembg_available = False
+
+if not rembg_available:
+    st.warning("이 기능은 로컬 환경에서만 사용 가능합니다.")
+    st.info("로컬에서 사용하려면: `pip install rembg onnxruntime` 설치 후 실행하세요.")
+    st.stop()
 
 uploaded_files = st.file_uploader(
     "사진 업로드 (여러 장 가능)",
@@ -42,7 +53,6 @@ if uploaded_files:
                 st.image(img, use_container_width=True)
 
             with st.spinner(f"{f.name} 배경 제거 중..."):
-                # rembg로 배경 제거
                 img_bytes = io.BytesIO()
                 img.save(img_bytes, format="PNG")
                 img_bytes.seek(0)
@@ -53,7 +63,6 @@ if uploaded_files:
                 st.markdown("**배경 제거**")
                 st.image(result_img, use_container_width=True)
 
-            # 결과 저장
             out_name = f"{f.name.rsplit('.', 1)[0]}_nobg.png"
             buf = io.BytesIO()
             result_img.save(buf, format="PNG")
@@ -61,38 +70,20 @@ if uploaded_files:
 
         st.divider()
 
-        # 다운로드
         if len(results) == 1:
             name, data = results[0]
-            st.download_button(
-                label="📥 다운로드 (PNG)",
-                data=data,
-                file_name=name,
-                mime="image/png",
-                use_container_width=True,
-            )
+            st.download_button("📥 다운로드 (PNG)", data, name, "image/png",
+                               use_container_width=True)
         else:
-            # ZIP 다운로드
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for name, data in results:
                     zf.writestr(name, data)
+            st.download_button(f"📥 전체 다운로드 (ZIP, {len(results)}장)",
+                               zip_buf.getvalue(), "nobg_photos.zip", "application/zip",
+                               use_container_width=True)
 
-            st.download_button(
-                label=f"📥 전체 다운로드 (ZIP, {len(results)}장)",
-                data=zip_buf.getvalue(),
-                file_name="nobg_photos.zip",
-                mime="application/zip",
-                use_container_width=True,
-            )
-
-            # 개별 다운로드
             with st.expander("개별 다운로드"):
                 for name, data in results:
-                    st.download_button(
-                        label=f"📥 {name}",
-                        data=data,
-                        file_name=name,
-                        mime="image/png",
-                        key=f"dl_{name}",
-                    )
+                    st.download_button(f"📥 {name}", data, name, "image/png",
+                                       key=f"dl_{name}")
