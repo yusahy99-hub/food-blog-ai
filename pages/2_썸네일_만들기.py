@@ -395,13 +395,63 @@ if uploaded_file and store_name:
     preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 540)
     components.html(preview, height=560, scrolling=False)
 
-    download = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
+    # 이미지 다운로드 (html2canvas로 브라우저에서 PNG 변환)
+    download_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
+    safe_name = store_name.replace('"', '').replace("'", "")
 
-    st.download_button(
-        label="📥 썸네일 다운로드 (HTML → 브라우저에서 스크린샷)",
-        data=download,
-        file_name=f"{store_name}_썸네일.html",
-        mime="text/html",
-        use_container_width=True,
-    )
-    st.caption("다운받은 HTML을 브라우저에서 열고 우클릭 → '이미지로 저장' 또는 스크린샷하세요")
+    download_component = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:sans-serif;background:transparent;display:flex;flex-direction:column;align-items:center}}
+.dl-btn{{
+    margin-top:12px;padding:12px 0;width:100%;max-width:540px;
+    background:linear-gradient(135deg,#FF6B35,#FF4F6F);color:#fff;
+    border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;
+    font-family:'Noto Sans KR',sans-serif;
+}}
+.dl-btn:hover{{opacity:0.9}}
+#render-area{{position:absolute;left:-9999px;top:0}}
+</style>
+</head><body>
+<button class="dl-btn" onclick="downloadImage()">이미지로 다운로드 (PNG)</button>
+<div id="render-area"></div>
+<script>
+function downloadImage() {{
+    var btn = document.querySelector('.dl-btn');
+    btn.textContent = '생성 중...';
+    btn.disabled = true;
+
+    var container = document.getElementById('render-area');
+    container.innerHTML = `{download_html.replace('`', '').replace(chr(10), ' ')}`;
+
+    // 폰트 로딩 대기
+    setTimeout(function() {{
+        var target = container.querySelector('.card') || container.querySelector('.wrap') || container.firstElementChild;
+        if (!target) {{ btn.textContent = '오류 발생'; return; }}
+
+        html2canvas(target, {{
+            scale: 1,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+            width: target.offsetWidth,
+            height: target.offsetHeight,
+        }}).then(function(canvas) {{
+            var link = document.createElement('a');
+            link.download = '{safe_name}_썸네일.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            btn.textContent = '이미지로 다운로드 (PNG)';
+            btn.disabled = false;
+        }}).catch(function(err) {{
+            btn.textContent = '다시 시도해주세요';
+            btn.disabled = false;
+        }});
+    }}, 1500);
+}}
+</script>
+</body></html>"""
+
+    components.html(download_component, height=60, scrolling=False)
