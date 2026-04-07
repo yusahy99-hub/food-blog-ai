@@ -1,6 +1,8 @@
+import io
 import base64
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 
 st.set_page_config(page_title="썸네일 만들기", page_icon="🖼️")
 
@@ -101,7 +103,22 @@ with st.expander("글자 크기 설정"):
 
 uploaded_file = st.file_uploader("배경 사진 업로드", type=["jpg", "jpeg", "png", "webp"])
 
-img_rotation = st.slider("사진 회전", -180, 180, 0, 5, help="사진을 회전시킵니다")
+# 회전 버튼
+rot_col1, rot_col2, rot_col3, rot_col4 = st.columns(4)
+with rot_col1:
+    if st.button("↩️ 왼쪽 90°"):
+        st.session_state["img_rot"] = st.session_state.get("img_rot", 0) + 90
+with rot_col2:
+    if st.button("↪️ 오른쪽 90°"):
+        st.session_state["img_rot"] = st.session_state.get("img_rot", 0) - 90
+with rot_col3:
+    if st.button("🔄 180°"):
+        st.session_state["img_rot"] = st.session_state.get("img_rot", 0) + 180
+with rot_col4:
+    if st.button("초기화"):
+        st.session_state["img_rot"] = 0
+
+img_rotation = st.session_state.get("img_rot", 0) % 360
 
 accent = COLOR_PRESETS[color_name]
 text_c = TEXT_COLORS[text_color_name]
@@ -116,16 +133,11 @@ def _w(c):
 
 
 def _head(fid, fname, rot=0):
-    rot_css = f"transform:rotate({rot}deg);transform-origin:center center;" if rot else ""
-    scale = 1.4 if rot else 1
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family={fid}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;font-family:'{fname}',sans-serif}}
-.card>img,.img-wrap>img{{
-  {rot_css}{"transform:rotate("+str(rot)+"deg) scale("+str(scale)+");" if rot else ""}
-}}
 """
 
 
@@ -392,68 +404,30 @@ def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, rot=0, size=
 
 if uploaded_file and store_name:
     uploaded_file.seek(0)
-    img_data = base64.standard_b64encode(uploaded_file.read()).decode("utf-8")
-    media_type = uploaded_file.type or "image/jpeg"
-    img_url = f"data:{media_type};base64,{img_data}"
+    pil_img = Image.open(uploaded_file).convert("RGB")
+    # PIL로 회전 (90도 단위, expand=True로 크기 유지)
+    if img_rotation:
+        pil_img = pil_img.rotate(img_rotation, expand=True, resample=Image.LANCZOS)
+    buf = io.BytesIO()
+    pil_img.save(buf, format="JPEG", quality=90)
+    img_data = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+    img_url = f"data:image/jpeg;base64,{img_data}"
 
     st.divider()
     st.subheader("미리보기")
 
-    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, img_rotation, 540)
+    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 540)
     components.html(preview, height=560, scrolling=False)
 
-    # 다운로드: HTML 파일을 받아서 브라우저에서 열면 자동 PNG 저장
-    download_html_raw = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, img_rotation, 1080)
+    # 다운로드용 1080px HTML
+    download_html_raw = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 0, 1080)
     safe_name = store_name.replace('"', '').replace("'", "")
 
-    full_page = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family={font_id}:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;
-  font-family:'Noto Sans KR',sans-serif;min-width:1120px}}
-#status{{color:#fff;margin:20px 0;font-size:18px}}
-.retry{{margin-top:10px;padding:10px 30px;background:#FF6B35;color:#fff;border:none;
-  border-radius:8px;font-size:14px;cursor:pointer;display:none}}
-</style>
-</head><body>
-<div id="status">이미지 생성 중... (2~3초 소요)</div>
-<button class="retry" id="retryBtn" onclick="capture()">다시 시도</button>
-<div id="thumb">{download_html_raw.replace(chr(10), ' ')}</div>
-<script>
-function capture() {{
-    document.getElementById('status').textContent = '이미지 생성 중...';
-    document.getElementById('retryBtn').style.display = 'none';
-    setTimeout(function() {{
-        var el = document.querySelector('#thumb .card') || document.querySelector('#thumb .wrap') || document.querySelector('#thumb > *:first-child');
-        if (!el) {{ document.getElementById('status').textContent = '오류 발생'; return; }}
-        html2canvas(el, {{
-            scale: 1, useCORS: true, allowTaint: true, backgroundColor: null,
-            width: el.scrollWidth, height: el.scrollHeight, windowWidth: 1200
-        }}).then(function(canvas) {{
-            var a = document.createElement('a');
-            a.download = '{safe_name}_썸네일.png';
-            a.href = canvas.toDataURL('image/png');
-            a.click();
-            document.getElementById('status').textContent = '다운로드 완료!';
-            document.getElementById('retryBtn').style.display = 'inline-block';
-            document.getElementById('retryBtn').textContent = '다시 다운로드';
-        }}).catch(function() {{
-            document.getElementById('status').textContent = '오류 발생. 아래 이미지를 우클릭해서 저장해주세요.';
-            document.getElementById('retryBtn').style.display = 'inline-block';
-        }});
-    }}, 2000);
-}}
-window.onload = function() {{ capture(); }};
-</script>
-</body></html>"""
-
     st.download_button(
-        label="📥 썸네일 다운로드 (HTML 파일 → 브라우저에서 열면 자동 PNG 저장)",
-        data=full_page,
+        label="📥 썸네일 다운로드 (HTML → 브라우저에서 열고 우클릭 저장)",
+        data=download_html_raw,
         file_name=f"{safe_name}_썸네일.html",
         mime="text/html",
         use_container_width=True,
     )
-    st.caption("다운받은 HTML 파일을 브라우저에서 열면 자동으로 PNG 이미지가 저장됩니다")
+    st.caption("다운받은 HTML 파일을 브라우저에서 열고, 이미지 위에서 우클릭 → 이미지로 저장")
