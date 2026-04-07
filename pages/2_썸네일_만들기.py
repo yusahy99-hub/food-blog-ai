@@ -589,15 +589,19 @@ if uploaded_file and store_name:
     components.html(preview, height=560, scrolling=False)
 
     safe_name = store_name.replace('"', '').replace("'", "")
-    st.caption(f"선택된 템플릿: {template_name} ({template})")
-    thumb = _pil_render(pil_img.copy(), store_name, store_location, subtitle, accent, text_c, template, sizes)
-    dl_buf = io.BytesIO()
-    thumb.save(dl_buf, format="PNG")
+    try:
+        thumb = _pil_render(pil_img.copy(), store_name, store_location, subtitle, accent, text_c, template, sizes)
+        dl_buf = io.BytesIO()
+        thumb.save(dl_buf, format="PNG")
 
-    st.download_button(
-        label="📥 썸네일 다운로드 (PNG)",
-        data=dl_buf.getvalue(),
-        file_name=f"{safe_name}_썸네일.png",
-        mime="image/png",
-        use_container_width=True,
-    )
+        st.download_button(
+            label="📥 썸네일 다운로드 (PNG)",
+            data=dl_buf.getvalue(),
+            file_name=f"{safe_name}_썸네일.png",
+            mime="image/png",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.error(f"이미지 생성 오류: {e}")
+        import traceback
+        st.code(traceback.format_exc())
