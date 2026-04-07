@@ -39,15 +39,22 @@ TEMPLATES = {
 # --- 폰트 로드 ---
 @st.cache_resource
 def load_font_path():
-    candidates = [
+    # .ttf 우선 (한글 확실 지원)
+    ttf_candidates = [
         "C:/Windows/Fonts/malgunbd.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "C:/Windows/Fonts/malgun.ttf",
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
-    candidates += glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
-    for p in candidates:
+    for p in ttf_candidates:
         if os.path.exists(p):
             return p
+
+    # .ttc는 인덱스 필요 - 별도 처리
+    ttc_candidates = glob.glob("/usr/share/fonts/**/Noto*CJK*.ttc", recursive=True)
+    if ttc_candidates:
+        return ttc_candidates[0]
+
+    # 다운로드
     import tempfile
     fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
     if not os.path.exists(fp):
@@ -59,6 +66,8 @@ FONT_PATH = load_font_path()
 
 def font(size):
     try:
+        if FONT_PATH.endswith(".ttc"):
+            return ImageFont.truetype(FONT_PATH, size, index=0)
         return ImageFont.truetype(FONT_PATH, size)
     except:
         return ImageFont.load_default()
@@ -101,7 +110,11 @@ with col3:
 with col4:
     color_name = st.selectbox("태그 색상", list(COLOR_PRESETS.keys()))
 
-text_color_name = st.selectbox("글씨 색상", list(TEXT_COLORS.keys()))
+col5, col6 = st.columns(2)
+with col5:
+    text_color_name = st.selectbox("글씨 색상", list(TEXT_COLORS.keys()))
+with col6:
+    font_weight = st.selectbox("글씨 굵기", ["보통", "굵게"])
 
 with st.expander("글자 크기 설정"):
     sc1, sc2, sc3 = st.columns(3)
