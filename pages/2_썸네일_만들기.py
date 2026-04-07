@@ -4,6 +4,10 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="썸네일 만들기", page_icon="🖼️")
 
+from auth import check_password
+if not check_password():
+    st.stop()
+
 st.markdown("""
 <style>
     .stMainBlockContainer { max-width: 720px; margin: 0 auto; }

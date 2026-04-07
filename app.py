@@ -1,5 +1,6 @@
 import os
 import base64
+from datetime import datetime
 import streamlit as st
 import anthropic
 from dotenv import load_dotenv
@@ -7,6 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(page_title="맛집 블로그 AI", page_icon="🍽️", layout="wide")
+
+from auth import check_password
+if not check_password():
+    st.stop()
 
 st.markdown("""
 <style>
@@ -123,6 +128,16 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                     messages=[{"role": "user", "content": messages_content}],
                 )
                 result = response.content[0].text
+
+                # 히스토리에 저장
+                if "blog_history" not in st.session_state:
+                    st.session_state.blog_history = []
+                st.session_state.blog_history.append({
+                    "store_name": store_name,
+                    "location": store_location,
+                    "text": result,
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                })
 
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")

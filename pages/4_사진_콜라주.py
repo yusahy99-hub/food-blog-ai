@@ -4,6 +4,10 @@ from PIL import Image
 
 st.set_page_config(page_title="사진 콜라주", page_icon="🖼️")
 
+from auth import check_password
+if not check_password():
+    st.stop()
+
 st.markdown("""
 <style>
     .stMainBlockContainer { max-width: 720px; margin: 0 auto; }

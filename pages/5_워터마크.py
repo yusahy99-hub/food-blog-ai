@@ -7,6 +7,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 st.set_page_config(page_title="워터마크", page_icon="💧")
 
+from auth import check_password
+if not check_password():
+    st.stop()
+
 st.markdown("""
 <style>
     .stMainBlockContainer { max-width: 720px; margin: 0 auto; }
