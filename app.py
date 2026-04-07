@@ -1,7 +1,7 @@
 import os
 import base64
 import streamlit as st
-from groq import Groq
+import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,10 +23,10 @@ st.markdown("""
 
 
 def get_api_key():
-    key = os.environ.get("GROQ_API_KEY", "")
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not key:
         try:
-            key = st.secrets.get("GROQ_API_KEY", "")
+            key = st.secrets.get("ANTHROPIC_API_KEY", "")
         except Exception:
             pass
     return key
@@ -70,14 +70,18 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
     elif not store_name:
         st.error("가게 이름을 입력해주세요.")
     else:
-        all_image_contents = []
+        image_contents = []
         for file in uploaded_files:
             file.seek(0)
             data = base64.standard_b64encode(file.read()).decode("utf-8")
             media_type = file.type or "image/jpeg"
-            all_image_contents.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{media_type};base64,{data}"},
+            image_contents.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": data,
+                },
             })
 
         length_guide = {
@@ -88,53 +92,7 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
 
         location_info = f"\n- 위치: {store_location}" if store_location else ""
 
-        with st.spinner("블로그 글을 작성 중입니다..."):
-            try:
-                client = Groq(api_key=api_key)
-
-                if len(all_image_contents) > 5:
-                    descriptions = []
-                    chunks = [all_image_contents[i:i+5] for i in range(0, len(all_image_contents), 5)]
-                    for chunk in chunks:
-                        analyze_prompt = f"이 사진들은 '{store_name}' 가게의 음식/공간 사진입니다. 각 사진에 보이는 음식, 재료, 플레이팅, 분위기 등을 한국어로 상세히 묘사해주세요."
-                        chunk_content = chunk + [{"type": "text", "text": analyze_prompt}]
-                        resp = client.chat.completions.create(
-                            model="meta-llama/llama-4-scout-17b-16e-instruct",
-                            messages=[{"role": "user", "content": chunk_content}],
-                            max_tokens=2048,
-                        )
-                        descriptions.append(resp.choices[0].message.content)
-
-                    combined = "\n\n".join(descriptions)
-                    final_prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
-아래 사진 분석 결과와 가게 정보를 바탕으로 블로그 포스팅을 작성해주세요.
-
-## 가게 정보
-- 가게 이름: {store_name}{location_info}
-
-## 사진 분석 결과
-{combined}
-
-## 작성 가이드
-- 톤: {tone} 말투로 작성
-- 분량: {length_guide[length]}
-- 자연스러운 맛집 블로그 형식 (제목, 소개, 음식 설명, 총평 포함)
-- 적절한 이모지 사용
-- 해시태그 5~10개를 마지막에 포함
-
-## 주의사항
-- 사진 분석 결과를 기반으로만 작성 (없는 내용 지어내지 않기)
-- 과장되지 않으면서도 매력적으로 표현
-- 한국 맛집 블로그 특유의 생동감 있는 문체 사용
-"""
-                    response = client.chat.completions.create(
-                        model="meta-llama/llama-4-scout-17b-16e-instruct",
-                        messages=[{"role": "user", "content": final_prompt}],
-                        max_tokens=4096,
-                    )
-                    result = response.choices[0].message.content
-                else:
-                    prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
+        prompt = f"""당신은 한국의 인기 맛집 블로거입니다.
 아래 정보를 바탕으로 블로그 포스팅을 작성해주세요.
 
 ## 가게 정보
@@ -153,13 +111,18 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
 - 과장되지 않으면서도 매력적으로 표현
 - 한국 맛집 블로그 특유의 생동감 있는 문체 사용
 """
-                    messages_content = all_image_contents + [{"type": "text", "text": prompt}]
-                    response = client.chat.completions.create(
-                        model="meta-llama/llama-4-scout-17b-16e-instruct",
-                        messages=[{"role": "user", "content": messages_content}],
-                        max_tokens=4096,
-                    )
-                    result = response.choices[0].message.content
+
+        messages_content = image_contents + [{"type": "text", "text": prompt}]
+
+        with st.spinner("블로그 글을 작성 중입니다..."):
+            try:
+                client = anthropic.Anthropic(api_key=api_key)
+                response = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=4096,
+                    messages=[{"role": "user", "content": messages_content}],
+                )
+                result = response.content[0].text
 
                 st.divider()
                 st.subheader("📝 생성된 블로그 글")
