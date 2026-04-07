@@ -446,7 +446,7 @@ def _pil_render(pil_img, name, loc, sub, accent, tc, tpl, S):
     def hex_to_rgba(h, a=255):
         h = h.lstrip("#")
         if len(h) == 3: h = h[0]*2+h[1]*2+h[2]*2
-        return (int(h[0:2],16), int(h[1:4][:2],16), int(h[4:6],16), a)
+        return (int(h[0:2],16), int(h[2:4],16), int(h[4:6],16), a)
 
     tc_rgb = hex_to_rgba(tc)
     ac_rgb = hex_to_rgba(accent)
@@ -589,7 +589,8 @@ if uploaded_file and store_name:
     components.html(preview, height=560, scrolling=False)
 
     safe_name = store_name.replace('"', '').replace("'", "")
-    thumb = _pil_render(pil_img, store_name, store_location, subtitle, accent, text_c, template, sizes)
+    st.caption(f"선택된 템플릿: {template_name} ({template})")
+    thumb = _pil_render(pil_img.copy(), store_name, store_location, subtitle, accent, text_c, template, sizes)
     dl_buf = io.BytesIO()
     thumb.save(dl_buf, format="PNG")
 
