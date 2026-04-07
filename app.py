@@ -1,8 +1,10 @@
+import io
 import os
 import base64
 from datetime import datetime
 import streamlit as st
 import anthropic
+from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -139,13 +141,19 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
         image_contents = []
         for file in uploaded_files:
             file.seek(0)
-            data = base64.standard_b64encode(file.read()).decode("utf-8")
-            media_type = file.type or "image/jpeg"
+            img = Image.open(file)
+            # 큰 이미지 리사이즈 (가로 또는 세로 1200px 이하로)
+            max_dim = 1200
+            if img.width > max_dim or img.height > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=85)
+            data = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
             image_contents.append({
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": media_type,
+                    "media_type": "image/jpeg",
                     "data": data,
                 },
             })
