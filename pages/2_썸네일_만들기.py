@@ -392,90 +392,132 @@ if uploaded_file and store_name:
     st.divider()
     st.subheader("미리보기 & 다운로드")
 
-    # 미리보기 + 다운로드 버튼을 하나의 컴포넌트로
-    inner_html = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
+    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 540)
+    components.html(preview, height=560, scrolling=False)
+
     safe_name = store_name.replace('"', '').replace("'", "")
 
-    combined = f"""
+    # Canvas API로 직접 이미지 생성
+    canvas_component = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family={font_id}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:transparent;display:flex;flex-direction:column;align-items:center}}
-#thumb-container{{width:1080px;height:1080px;transform-origin:top left;}}
+body{{background:transparent;display:flex;justify-content:center}}
 .dl-btn{{
-    margin-top:16px;padding:14px 0;width:540px;
+    padding:14px 0;width:100%;max-width:540px;
     background:linear-gradient(135deg,#FF6B35,#FF4F6F);color:#fff;
     border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;
 }}
 .dl-btn:hover{{opacity:0.9}}
 </style>
 </head><body>
-<div id="thumb-wrapper" style="width:540px;height:540px;overflow:hidden;">
-<div id="thumb-container" style="transform:scale(0.5);">
-</div>
-</div>
-<button class="dl-btn" onclick="downloadImage()">이미지로 다운로드 (PNG)</button>
+<button class="dl-btn" onclick="render()">이미지로 다운로드 (PNG)</button>
+<canvas id="cv" width="1080" height="1080" style="display:none"></canvas>
 <script>
-var thumbHTML = `{inner_html.replace(chr(96), "").replace(chr(10), " ")}`;
-// body 내용만 추출
-var bodyMatch = thumbHTML.match(/<body[^>]*>([\\ s\\S]*?)<\\/body>/i);
-var styleMatch = thumbHTML.match(/<style[^>]*>([\\ s\\S]*?)<\\/style>/i);
+var img = new Image();
+img.crossOrigin = 'anonymous';
+img.src = '{img_url}';
 
-if (styleMatch) {{
-    var s = document.createElement('style');
-    s.textContent = styleMatch[1];
-    document.head.appendChild(s);
-}}
-if (bodyMatch) {{
-    document.getElementById('thumb-container').innerHTML = bodyMatch[1];
-}}
-
-function downloadImage() {{
+function render() {{
     var btn = document.querySelector('.dl-btn');
     btn.textContent = '생성 중...';
     btn.disabled = true;
 
-    var container = document.getElementById('thumb-container');
-    // 캡처 시 원본 크기로 복원
-    container.style.transform = 'scale(1)';
-    container.parentElement.style.width = '1080px';
-    container.parentElement.style.height = '1080px';
-    container.parentElement.style.overflow = 'visible';
+    var c = document.getElementById('cv');
+    var ctx = c.getContext('2d');
+    var W = 1080, H = 1080;
+
+    // 1. 이미지 그리기 (center crop)
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var ratio = Math.max(W/iw, H/ih);
+    var nw = iw*ratio, nh = ih*ratio;
+    var ox = (W-nw)/2, oy = (H-nh)/2;
+    ctx.drawImage(img, ox, oy, nw, nh);
+
+    // 2. 그라데이션 오버레이
+    var grad = ctx.createLinearGradient(0, H*0.3, 0, H);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.4, 'rgba(0,0,0,0.15)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.88)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 폰트 로딩
+    var fontName = '{font_css}';
+    var link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family={font_id}:wght@400;700;900&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
 
     setTimeout(function() {{
-        html2canvas(container, {{
-            scale: 1,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: null,
-            width: 1080,
-            height: 1080,
-        }}).then(function(canvas) {{
-            // 다시 축소
-            container.style.transform = 'scale(0.5)';
-            container.parentElement.style.width = '540px';
-            container.parentElement.style.height = '540px';
-            container.parentElement.style.overflow = 'hidden';
+        var tc = '{text_c}';
+        var ac = '{accent}';
+        var nameSize = {int(sizes["name"] * 2)};
+        var subSize = {int(sizes["sub"] * 2)};
+        var tagSize = {int(sizes["tag"] * 2)};
 
-            var link = document.createElement('a');
-            link.download = '{safe_name}_썸네일.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-            btn.textContent = '이미지로 다운로드 (PNG)';
-            btn.disabled = false;
-        }}).catch(function(err) {{
-            container.style.transform = 'scale(0.5)';
-            container.parentElement.style.width = '540px';
-            container.parentElement.style.height = '540px';
-            container.parentElement.style.overflow = 'hidden';
-            btn.textContent = '다시 시도';
-            btn.disabled = false;
-        }});
-    }}, 500);
+        var ml = 80;
+        var bottom = H - 100;
+
+        // 가게 이름
+        ctx.font = '900 ' + nameSize + 'px "' + fontName + '", sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillText('{safe_name}', ml+3, bottom+3);
+        ctx.fillStyle = tc;
+        ctx.fillText('{safe_name}', ml, bottom);
+
+        // 설명 문구
+        var subText = '{subtitle.replace(chr(39), "").replace(chr(34), "")}';
+        if (subText) {{
+            ctx.font = '400 ' + subSize + 'px "' + fontName + '", sans-serif';
+            ctx.fillStyle = tc + 'dd';
+            ctx.fillText(subText, ml, bottom - nameSize - 16);
+        }}
+
+        // 위치 태그
+        var locText = '{store_location.replace(chr(39), "").replace(chr(34), "")}';
+        if (locText) {{
+            ctx.font = '700 ' + tagSize + 'px "' + fontName + '", sans-serif';
+            var tw = ctx.measureText(locText).width;
+            var tagY = bottom - nameSize - (subText ? subSize + 36 : 20) - tagSize - 24;
+            var px = 24, py = 14;
+
+            // 태그 배경
+            ctx.fillStyle = ac;
+            ctx.beginPath();
+            var rx = ml, ry = tagY - py, rw = tw + px*2, rh = tagSize + py*2, r = 10;
+            ctx.moveTo(rx+r, ry);
+            ctx.lineTo(rx+rw-r, ry); ctx.quadraticCurveTo(rx+rw, ry, rx+rw, ry+r);
+            ctx.lineTo(rx+rw, ry+rh-r); ctx.quadraticCurveTo(rx+rw, ry+rh, rx+rw-r, ry+rh);
+            ctx.lineTo(rx+r, ry+rh); ctx.quadraticCurveTo(rx, ry+rh, rx, ry+rh-r);
+            ctx.lineTo(rx, ry+r); ctx.quadraticCurveTo(rx, ry, rx+r, ry);
+            ctx.fill();
+
+            // 태그 텍스트
+            ctx.fillStyle = (ac.toUpperCase() === '#FFFFFF') ? '#222' : '#fff';
+            ctx.fillText(locText, ml + px, tagY + tagSize*0.2);
+
+            // 꺾쇠 장식
+            ctx.strokeStyle = tc + '70';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(ml - 20, tagY - 30 + 50);
+            ctx.lineTo(ml - 20, tagY - 30);
+            ctx.lineTo(ml - 20 + 50, tagY - 30);
+            ctx.stroke();
+        }}
+
+        // 다운로드
+        var link2 = document.createElement('a');
+        link2.download = '{safe_name}_썸네일.png';
+        link2.href = c.toDataURL('image/png');
+        link2.click();
+        btn.textContent = '이미지로 다운로드 (PNG)';
+        btn.disabled = false;
+    }}, 1000);
 }}
 </script>
 </body></html>"""
 
-    components.html(combined, height=610, scrolling=False)
+    components.html(canvas_component, height=55, scrolling=False)
