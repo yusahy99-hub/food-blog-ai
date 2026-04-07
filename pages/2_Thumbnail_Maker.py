@@ -36,11 +36,19 @@ TEMPLATES = {
 FONT_OPTIONS = {
     "Noto Sans KR (고딕)": "Noto+Sans+KR",
     "Noto Serif KR (명조)": "Noto+Serif+KR",
-    "Black Han Sans (굵은 고딕)": "Black+Han+Sans",
+    "Black Han Sans (굵은 제목)": "Black+Han+Sans",
     "Jua (둥근 고딕)": "Jua",
     "Do Hyeon (네모 고딕)": "Do+Hyeon",
     "Gaegu (손글씨)": "Gaegu",
     "Gowun Batang (바탕)": "Gowun+Batang",
+    "Sunflower (라운드)": "Sunflower",
+    "Gothic A1 (모던 고딕)": "Gothic+A1",
+    "Nanum Myeongjo (나눔명조)": "Nanum+Myeongjo",
+    "Nanum Gothic (나눔고딕)": "Nanum+Gothic",
+    "Gamja Flower (귀여운)": "Gamja+Flower",
+    "Single Day (캐주얼)": "Single+Day",
+    "East Sea Dokdo (붓글씨)": "East+Sea+Dokdo",
+    "Stylish (스타일리시)": "Stylish",
 }
 
 # --- 입력 ---
@@ -60,12 +68,23 @@ with col4:
 with col5:
     font_name = st.selectbox("폰트", list(FONT_OPTIONS.keys()))
 
+# --- 글자 크기 설정 ---
+with st.expander("글자 크기 설정"):
+    sc1, sc2, sc3 = st.columns(3)
+    with sc1:
+        name_size = st.slider("가게 이름", 20, 80, 38, 2)
+    with sc2:
+        sub_size = st.slider("설명 문구", 10, 40, 16, 1)
+    with sc3:
+        tag_size = st.slider("위치 태그", 8, 30, 13, 1)
+
 uploaded_file = st.file_uploader("배경 사진 업로드", type=["jpg", "jpeg", "png", "webp"])
 
 accent = COLOR_PRESETS[color_name]
 template = TEMPLATES[template_name]
 font_id = FONT_OPTIONS[font_name]
 font_css = font_id.replace("+", " ")
+sizes = {"name": name_size, "sub": sub_size, "tag": tag_size}
 
 
 def _is_white(c):
@@ -98,7 +117,7 @@ def _tag_html(loc, accent, style="pill"):
 
 
 # ===== 1. 모던 좌측 =====
-def _modern(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _modern(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     tag = _tag_html(loc, accent, "pill")
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
     return _head(fid, fname, sz) + f"""
@@ -111,10 +130,10 @@ def _modern(url, name, loc, sub, accent, sz, sc, fid, fname):
   border-left:{int(2.5*sc)}px solid rgba(255,255,255,0.45);
   border-top:{int(2.5*sc)}px solid rgba(255,255,255,0.45);margin-bottom:{int(16*sc)}px}}
 .tag{{display:inline-block;padding:{int(5*sc)}px {int(16*sc)}px;border-radius:{int(20*sc)}px;
-  font-size:{int(13*sc)}px;font-weight:700;margin-bottom:{int(12*sc)}px;letter-spacing:.5px}}
-.sub{{color:rgba(255,255,255,.88);font-size:{int(16*sc)}px;font-weight:400;margin-bottom:{int(6*sc)}px;
+  font-size:{int(S["tag"]*sc)}px;font-weight:700;margin-bottom:{int(12*sc)}px;letter-spacing:.5px}}
+.sub{{color:rgba(255,255,255,.88);font-size:{int(S["sub"]*sc)}px;font-weight:400;margin-bottom:{int(6*sc)}px;
   text-shadow:0 1px 4px rgba(0,0,0,.4)}}
-.name{{color:#fff;font-size:{int(38*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-1px;
+.name{{color:#fff;font-size:{int(S["name"]*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-1px;
   text-shadow:0 2px 8px rgba(0,0,0,.4)}}
 </style></head><body>
 <div class="card"><img src="{url}"/><div class="grad"></div>
@@ -123,7 +142,7 @@ def _modern(url, name, loc, sub, accent, sz, sc, fid, fname):
 
 
 # ===== 2. 센터 =====
-def _center(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _center(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     tag = _tag_html(loc, accent, "outline")
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
     ac = '#ccc' if _is_white(accent) else accent
@@ -135,10 +154,10 @@ def _center(url, name, loc, sub, accent, sz, sc, fid, fname):
 .txt{{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%}}
 .deco{{width:{int(50*sc)}px;height:{int(2.5*sc)}px;background:{ac};margin:0 auto {int(18*sc)}px;border-radius:2px}}
 .tag{{display:inline-block;padding:{int(5*sc)}px {int(18*sc)}px;border-radius:{int(20*sc)}px;
-  font-size:{int(13*sc)}px;font-weight:700;margin-bottom:{int(14*sc)}px;letter-spacing:1px}}
-.name{{color:#fff;font-size:{int(44*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-1px;
+  font-size:{int(S["tag"]*sc)}px;font-weight:700;margin-bottom:{int(14*sc)}px;letter-spacing:1px}}
+.name{{color:#fff;font-size:{int(S["name"]*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-1px;
   text-shadow:0 3px 12px rgba(0,0,0,.5);margin-bottom:{int(14*sc)}px}}
-.sub{{color:rgba(255,255,255,.9);font-size:{int(16*sc)}px;font-weight:400;margin-bottom:{int(10*sc)}px;
+.sub{{color:rgba(255,255,255,.9);font-size:{int(S["sub"]*sc)}px;font-weight:400;margin-bottom:{int(10*sc)}px;
   text-shadow:0 1px 4px rgba(0,0,0,.5)}}
 .deco-b{{width:{int(50*sc)}px;height:{int(2.5*sc)}px;background:{ac};margin:{int(4*sc)}px auto 0;border-radius:2px}}
 </style></head><body>
@@ -148,7 +167,7 @@ def _center(url, name, loc, sub, accent, sz, sc, fid, fname):
 
 
 # ===== 3. 미니멀 바 =====
-def _minimal(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _minimal(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     w = _is_white(accent)
     lc = '#333' if w else accent
     bc = '#ddd' if w else accent
@@ -160,11 +179,11 @@ def _minimal(url, name, loc, sub, accent, sz, sc, fid, fname):
 .bar{{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.82);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   padding:{int(28*sc)}px {int(36*sc)}px;border-top:3px solid {bc}}}
-.name{{color:#fff;font-size:{int(30*sc)}px;font-weight:900;letter-spacing:-.5px;margin-bottom:{int(8*sc)}px}}
+.name{{color:#fff;font-size:{int(S["name"]*sc)}px;font-weight:900;letter-spacing:-.5px;margin-bottom:{int(8*sc)}px}}
 .meta{{display:flex;align-items:center;gap:{int(6*sc)}px;flex-wrap:wrap}}
-.loc{{font-size:{int(14*sc)}px;font-weight:700;letter-spacing:.3px}}
-.dot{{color:rgba(255,255,255,.3);font-size:{int(14*sc)}px}}
-.sub{{color:rgba(255,255,255,.7);font-size:{int(14*sc)}px;font-weight:400}}
+.loc{{font-size:{int(S["tag"]*sc)}px;font-weight:700;letter-spacing:.3px}}
+.dot{{color:rgba(255,255,255,.3);font-size:{int(S["tag"]*sc)}px}}
+.sub{{color:rgba(255,255,255,.7);font-size:{int(S["sub"]*sc)}px;font-weight:400}}
 </style></head><body>
 <div class="card"><img src="{url}"/>
 <div class="bar"><div class="name">{name}</div><div class="meta">{loc_h}{sub_h}</div></div>
@@ -172,7 +191,7 @@ def _minimal(url, name, loc, sub, accent, sz, sc, fid, fname):
 
 
 # ===== 4. 매거진 =====
-def _magazine(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _magazine(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     w = _is_white(accent)
     ac = '#333' if w else accent
     tag = ""
@@ -185,10 +204,10 @@ def _magazine(url, name, loc, sub, accent, sz, sc, fid, fname):
 .grad{{position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.7)0%,transparent 50%,transparent 100%)}}
 .txt{{position:absolute;top:{int(50*sc)}px;left:{int(44*sc)}px;max-width:65%}}
 .tag{{display:inline-block;padding:{int(4*sc)}px {int(14*sc)}px;border-radius:{int(4*sc)}px;
-  font-size:{int(11*sc)}px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:{int(16*sc)}px}}
-.name{{color:#fff;font-size:{int(42*sc)}px;font-weight:900;line-height:1.1;letter-spacing:-1.5px;
+  font-size:{int(S["tag"]*sc)}px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:{int(16*sc)}px}}
+.name{{color:#fff;font-size:{int(S["name"]*sc)}px;font-weight:900;line-height:1.1;letter-spacing:-1.5px;
   margin-bottom:{int(12*sc)}px;text-shadow:0 2px 10px rgba(0,0,0,.3)}}
-.sub{{color:rgba(255,255,255,.8);font-size:{int(15*sc)}px;font-weight:400;line-height:1.5;
+.sub{{color:rgba(255,255,255,.8);font-size:{int(S["sub"]*sc)}px;font-weight:400;line-height:1.5;
   border-left:3px solid {ac};padding-left:{int(12*sc)}px}}
 .corner{{position:absolute;bottom:{int(44*sc)}px;right:{int(44*sc)}px;
   width:{int(40*sc)}px;height:{int(40*sc)}px;
@@ -201,7 +220,7 @@ def _magazine(url, name, loc, sub, accent, sz, sc, fid, fname):
 
 
 # ===== 5. 프레임 =====
-def _framed(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _framed(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     w = _is_white(accent)
     bc = '#ccc' if w else accent
     tc = '#222' if w else '#fff'
@@ -218,11 +237,11 @@ def _framed(url, name, loc, sub, accent, sz, sc, fid, fname):
   border:2px solid rgba(255,255,255,.4);border-radius:{int(8*sc)}px}}
 .txt{{position:absolute;bottom:{int(56*sc)}px;left:{int(52*sc)}px;right:{int(52*sc)}px;text-align:center}}
 .tag{{display:inline-block;padding:{int(4*sc)}px {int(16*sc)}px;border:1.5px solid;
-  border-radius:{int(20*sc)}px;font-size:{int(12*sc)}px;font-weight:700;
+  border-radius:{int(20*sc)}px;font-size:{int(S["tag"]*sc)}px;font-weight:700;
   margin-bottom:{int(14*sc)}px;letter-spacing:1px}}
-.name{{color:#fff;font-size:{int(40*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-.5px;
+.name{{color:#fff;font-size:{int(S["name"]*sc)}px;font-weight:900;line-height:1.15;letter-spacing:-.5px;
   margin-bottom:{int(10*sc)}px;text-shadow:0 2px 8px rgba(0,0,0,.4)}}
-.sub{{color:rgba(255,255,255,.85);font-size:{int(15*sc)}px;font-weight:400;
+.sub{{color:rgba(255,255,255,.85);font-size:{int(S["sub"]*sc)}px;font-weight:400;
   text-shadow:0 1px 3px rgba(0,0,0,.4)}}
 .top-deco{{position:absolute;top:{int(52*sc)}px;left:50%;transform:translateX(-50%);
   width:{int(40*sc)}px;height:{int(2.5*sc)}px;background:{bc};border-radius:2px}}
@@ -234,7 +253,7 @@ def _framed(url, name, loc, sub, accent, sz, sc, fid, fname):
 
 
 # ===== 6. 스플릿 =====
-def _split(url, name, loc, sub, accent, sz, sc, fid, fname):
+def _split(url, name, loc, sub, accent, sz, sc, fid, fname, S):
     w = _is_white(accent)
     ac = '#333' if w else accent
     tag = ""
@@ -248,11 +267,11 @@ def _split(url, name, loc, sub, accent, sz, sc, fid, fname):
 .img-wrap img{{width:100%;height:100%;object-fit:cover}}
 .bottom{{background:#fff;padding:{int(30*sc)}px {int(36*sc)}px;
   border-top:4px solid {ac}}}
-.name{{color:#1a1a1a;font-size:{int(32*sc)}px;font-weight:900;letter-spacing:-.5px;margin-bottom:{int(8*sc)}px}}
+.name{{color:#1a1a1a;font-size:{int(S["name"]*sc)}px;font-weight:900;letter-spacing:-.5px;margin-bottom:{int(8*sc)}px}}
 .meta{{display:flex;align-items:center;gap:{int(10*sc)}px;flex-wrap:wrap}}
-.loc{{font-size:{int(14*sc)}px;font-weight:700}}
-.sub{{color:#666;font-size:{int(14*sc)}px;font-weight:400}}
-.divider{{color:#ccc;font-size:{int(14*sc)}px}}
+.loc{{font-size:{int(S["tag"]*sc)}px;font-weight:700}}
+.sub{{color:#666;font-size:{int(S["sub"]*sc)}px;font-weight:400}}
+.divider{{color:#ccc;font-size:{int(S["sub"]*sc)}px}}
 </style></head><body>
 <div class="card">
 <div class="img-wrap"><img src="{url}"/></div>
@@ -261,13 +280,13 @@ def _split(url, name, loc, sub, accent, sz, sc, fid, fname):
 </div></body></html>"""
 
 
-def build_html(url, name, loc, sub, accent, tpl, fid, fname, size=540):
+def build_html(url, name, loc, sub, accent, tpl, fid, fname, S, size=540):
     sc = size / 540
     funcs = {
         "modern": _modern, "center": _center, "minimal": _minimal,
         "magazine": _magazine, "frame": _framed, "split": _split,
     }
-    return funcs[tpl](url, name, loc, sub, accent, size, sc, fid, fname)
+    return funcs[tpl](url, name, loc, sub, accent, size, sc, fid, fname, S)
 
 
 if uploaded_file and store_name:
@@ -279,10 +298,10 @@ if uploaded_file and store_name:
     st.divider()
     st.subheader("미리보기")
 
-    preview = build_html(img_url, store_name, store_location, subtitle, accent, template, font_id, font_css, 540)
+    preview = build_html(img_url, store_name, store_location, subtitle, accent, template, font_id, font_css, sizes, 540)
     components.html(preview, height=560, scrolling=False)
 
-    download = build_html(img_url, store_name, store_location, subtitle, accent, template, font_id, font_css, 1080)
+    download = build_html(img_url, store_name, store_location, subtitle, accent, template, font_id, font_css, sizes, 1080)
 
     st.download_button(
         label="📥 썸네일 다운로드 (HTML → 브라우저에서 스크린샷)",
