@@ -101,6 +101,8 @@ with st.expander("글자 크기 설정"):
 
 uploaded_file = st.file_uploader("배경 사진 업로드", type=["jpg", "jpeg", "png", "webp"])
 
+img_rotation = st.slider("사진 회전", -180, 180, 0, 5, help="사진을 회전시킵니다")
+
 accent = COLOR_PRESETS[color_name]
 text_c = TEXT_COLORS[text_color_name]
 template = TEMPLATES[template_name]
@@ -113,12 +115,17 @@ def _w(c):
     return c.upper() in ("#FFFFFF", "#FFF")
 
 
-def _head(fid, fname):
+def _head(fid, fname, rot=0):
+    rot_css = f"transform:rotate({rot}deg);transform-origin:center center;" if rot else ""
+    scale = 1.4 if rot else 1
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family={fid}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;font-family:'{fname}',sans-serif}}
+.card>img,.img-wrap>img{{
+  {rot_css}{"transform:rotate("+str(rot)+"deg) scale("+str(scale)+");" if rot else ""}
+}}
 """
 
 
@@ -133,10 +140,10 @@ def _tag(loc, accent, tc):
 
 
 # ===== 1. 모던 좌측 =====
-def _modern(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _modern(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     tag = _tag(loc, accent, tc)
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{position:absolute;bottom:0;left:0;right:0;height:70%;
@@ -157,12 +164,12 @@ def _modern(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 2. 센터 =====
-def _center(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _center(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     w = _w(accent)
     ac = '#ccc' if w else accent
     tag = f'<div class="tag" style="border:2px solid {ac};color:{tc}">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.2)0%,rgba(0,0,0,.6)100%)}}
@@ -182,13 +189,13 @@ def _center(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 3. 미니멀 바 =====
-def _minimal(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _minimal(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     w = _w(accent)
     bc = '#ddd' if w else accent
     lc = '#333' if w else accent
     loc_h = f'<span class="loc" style="color:{lc}">{loc}</span><span class="dot">·</span>' if loc else ""
     sub_h = f'<span class="sub">{sub}</span>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .bar{{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.82);
@@ -205,12 +212,12 @@ def _minimal(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 4. 매거진 =====
-def _magazine(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _magazine(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     w = _w(accent)
     ac = '#333' if w else accent
     tag = f'<div class="tag" style="background:{ac};color:#fff">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,0,0,.7)0%,transparent 50%,transparent 100%)}}
@@ -232,12 +239,12 @@ def _magazine(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 5. 프레임 =====
-def _framed(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _framed(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     w = _w(accent)
     bc = '#ccc' if w else accent
     tag = f'<div class="tag" style="border-color:{bc};color:{tc}">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{position:absolute;inset:0;background:rgba(0,0,0,.35)}}
@@ -261,12 +268,12 @@ def _framed(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 6. 스플릿 =====
-def _split(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _split(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     w = _w(accent)
     ac = '#333' if w else accent
     tag = f'<span class="loc" style="color:{ac}">📍 {loc}</span>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px;
   display:flex;flex-direction:column}}
 .img-wrap{{position:relative;flex:1;overflow:hidden}}
@@ -286,12 +293,12 @@ def _split(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 7. 시네마틱 =====
-def _cinematic(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _cinematic(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     ac = accent
     tag = f'<span class="loc">{loc}</span>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
     bar = int(sz * 0.1)
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .bar-t,.bar-b{{position:absolute;left:0;right:0;background:#000;height:{bar}px}}
@@ -310,10 +317,10 @@ def _cinematic(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 8. 폴라로이드 =====
-def _polaroid(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _polaroid(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     pad = int(24*sc)
     bot = int(80*sc)
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .wrap{{width:{sz}px;height:{sz}px;display:flex;align-items:center;justify-content:center;
   background:#f0ede8;border-radius:{int(12*sc)}px}}
 .card{{background:#fff;padding:{pad}px {pad}px {bot}px;box-shadow:0 4px 20px rgba(0,0,0,.12);
@@ -330,11 +337,11 @@ def _polaroid(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 9. 네온 =====
-def _neon(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _neon(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     ac = accent
     tag = f'<div class="tag">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover;filter:brightness(0.4) contrast(1.1)}}
 .txt{{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:85%}}
@@ -352,11 +359,11 @@ def _neon(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 
 
 # ===== 10. 타이포 =====
-def _typo(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
+def _typo(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S, rot=0):
     ac = accent
     tag = f'<span class="loc" style="color:{ac}">{loc}</span>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
-    return _head(fid, fname) + f"""
+    return _head(fid, fname, rot) + f"""
 .card{{position:relative;width:{sz}px;height:{sz}px;overflow:hidden;border-radius:{int(12*sc)}px}}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{position:absolute;inset:0;background:rgba(0,0,0,.55)}}
@@ -373,14 +380,14 @@ def _typo(url, name, loc, sub, accent, tc, sz, sc, fid, fname, S):
 </div></body></html>"""
 
 
-def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, size=540):
+def build_html(url, name, loc, sub, accent, tc, tpl, fid, fname, S, rot=0, size=540):
     sc = size / 540
     funcs = {
         "modern": _modern, "center": _center, "minimal": _minimal,
         "magazine": _magazine, "frame": _framed, "split": _split,
         "cinematic": _cinematic, "polaroid": _polaroid, "neon": _neon, "typo": _typo,
     }
-    return funcs[tpl](url, name, loc, sub, accent, tc, size, sc, fid, fname, S)
+    return funcs[tpl](url, name, loc, sub, accent, tc, size, sc, fid, fname, S, rot)
 
 
 if uploaded_file and store_name:
@@ -392,14 +399,13 @@ if uploaded_file and store_name:
     st.divider()
     st.subheader("미리보기")
 
-    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 540)
+    preview = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, img_rotation, 540)
     components.html(preview, height=560, scrolling=False)
 
-    # 다운로드: 1080px HTML을 새 창에서 열고 html2canvas로 자동 다운로드
-    download_html_raw = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, 1080)
+    # 다운로드: HTML 파일을 받아서 브라우저에서 열면 자동 PNG 저장
+    download_html_raw = build_html(img_url, store_name, store_location, subtitle, accent, text_c, template, font_id, font_css, sizes, img_rotation, 1080)
     safe_name = store_name.replace('"', '').replace("'", "")
 
-    # 새 창에서 열리는 자체 다운로드 HTML
     full_page = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family={font_id}:wght@400;700;900&display=swap" rel="stylesheet">
@@ -408,49 +414,46 @@ if uploaded_file and store_name:
 body{{background:#111;display:flex;flex-direction:column;align-items:center;padding:20px;
   font-family:'Noto Sans KR',sans-serif;min-width:1120px}}
 #status{{color:#fff;margin:20px 0;font-size:18px}}
+.retry{{margin-top:10px;padding:10px 30px;background:#FF6B35;color:#fff;border:none;
+  border-radius:8px;font-size:14px;cursor:pointer;display:none}}
 </style>
 </head><body>
-<div id="status">이미지 생성 중...</div>
+<div id="status">이미지 생성 중... (2~3초 소요)</div>
+<button class="retry" id="retryBtn" onclick="capture()">다시 시도</button>
 <div id="thumb">{download_html_raw.replace(chr(10), ' ')}</div>
 <script>
-window.onload = function() {{
+function capture() {{
+    document.getElementById('status').textContent = '이미지 생성 중...';
+    document.getElementById('retryBtn').style.display = 'none';
     setTimeout(function() {{
         var el = document.querySelector('#thumb .card') || document.querySelector('#thumb .wrap') || document.querySelector('#thumb > *:first-child');
         if (!el) {{ document.getElementById('status').textContent = '오류 발생'; return; }}
         html2canvas(el, {{
             scale: 1, useCORS: true, allowTaint: true, backgroundColor: null,
-            width: el.scrollWidth, height: el.scrollHeight,
-            windowWidth: 1200
+            width: el.scrollWidth, height: el.scrollHeight, windowWidth: 1200
         }}).then(function(canvas) {{
             var a = document.createElement('a');
             a.download = '{safe_name}_썸네일.png';
             a.href = canvas.toDataURL('image/png');
             a.click();
-            document.getElementById('status').textContent = '다운로드 완료! 이 탭을 닫으세요.';
+            document.getElementById('status').textContent = '다운로드 완료!';
+            document.getElementById('retryBtn').style.display = 'inline-block';
+            document.getElementById('retryBtn').textContent = '다시 다운로드';
         }}).catch(function() {{
-            document.getElementById('status').textContent = '오류 발생. 우클릭으로 이미지 저장해주세요.';
+            document.getElementById('status').textContent = '오류 발생. 아래 이미지를 우클릭해서 저장해주세요.';
+            document.getElementById('retryBtn').style.display = 'inline-block';
         }});
     }}, 2000);
-}};
+}}
+window.onload = function() {{ capture(); }};
 </script>
 </body></html>"""
 
-    import urllib.parse
-    data_uri = "data:text/html;charset=utf-8," + urllib.parse.quote(full_page)
-
-    dl_btn = f"""
-<html><head><style>
-*{{margin:0;padding:0}}
-body{{background:transparent;display:flex;justify-content:center}}
-.dl-btn{{
-    padding:14px 0;width:100%;max-width:540px;
-    background:linear-gradient(135deg,#FF6B35,#FF4F6F);color:#fff;
-    border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;
-}}
-.dl-btn:hover{{opacity:0.9}}
-</style></head><body>
-<button class="dl-btn" onclick="window.open('{data_uri}','_blank')">
-이미지로 다운로드 (PNG)</button>
-</body></html>"""
-
-    components.html(dl_btn, height=55, scrolling=False)
+    st.download_button(
+        label="📥 썸네일 다운로드 (HTML 파일 → 브라우저에서 열면 자동 PNG 저장)",
+        data=full_page,
+        file_name=f"{safe_name}_썸네일.html",
+        mime="text/html",
+        use_container_width=True,
+    )
+    st.caption("다운받은 HTML 파일을 브라우저에서 열면 자동으로 PNG 이미지가 저장됩니다")
