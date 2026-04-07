@@ -18,7 +18,7 @@ def check_password():
         except Exception:
             pass
     if not correct_password:
-        correct_password = "foodblog2024"
+        correct_password = "990518"
 
     st.markdown(
         "<style>.stMainBlockContainer{max-width:480px;margin:0 auto}</style>",
