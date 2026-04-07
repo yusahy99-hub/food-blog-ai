@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-st.set_page_config(page_title="맛집 블로그 AI", page_icon="🍽️", layout="wide")
+st.set_page_config(page_title="블로그 글쓰기 AI", page_icon="✍️", layout="wide")
 
 from auth import check_password
 if not check_password():
@@ -37,14 +37,8 @@ def get_api_key():
     return key
 
 
-# --- 사이드바 ---
-with st.sidebar:
-    st.header("글 스타일")
-    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"])
-    length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"])
-
 # --- 메인 ---
-st.title("🍽️ 맛집 블로그 AI")
+st.title("✍️ 블로그 글쓰기 AI")
 st.caption("사진을 올리면 맛집 블로거처럼 글을 써드립니다!")
 
 col1, col2 = st.columns(2)
@@ -52,6 +46,12 @@ with col1:
     store_name = st.text_input("가게 이름", placeholder="예: 을지로 골목식당")
 with col2:
     store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처")
+
+col3, col4 = st.columns(2)
+with col3:
+    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"])
+with col4:
+    length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"])
 
 uploaded_files = st.file_uploader(
     "음식/공간 사진 업로드",
