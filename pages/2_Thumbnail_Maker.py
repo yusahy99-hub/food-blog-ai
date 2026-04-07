@@ -20,6 +20,7 @@ COLOR_PRESETS = {
     "민트": "#10B981",
     "퍼플": "#8B5CF6",
     "골드": "#F59E0B",
+    "화이트": "#FFFFFF",
     "블랙": "#1F2937",
 }
 
@@ -29,6 +30,16 @@ TEMPLATE_OPTIONS = {
     "미니멀 (하단 바)": "minimal",
 }
 
+FONT_OPTIONS = {
+    "Noto Sans KR (고딕)": "Noto+Sans+KR",
+    "Noto Serif KR (명조)": "Noto+Serif+KR",
+    "Black Han Sans (굵은 고딕)": "Black+Han+Sans",
+    "Jua (둥근 고딕)": "Jua",
+    "Do Hyeon (네모 고딕)": "Do+Hyeon",
+    "Gaegu (손글씨)": "Gaegu",
+    "Gowun Batang (바탕)": "Gowun+Batang",
+}
+
 # --- 입력 ---
 col1, col2 = st.columns(2)
 with col1:
@@ -36,42 +47,48 @@ with col1:
 with col2:
     store_location = st.text_input("위치 태그", placeholder="예: 성수")
 
+subtitle = st.text_input("설명 문구", placeholder="예: 성수동 직장인 추천 족발맛집")
+
 col3, col4, col5 = st.columns(3)
 with col3:
-    subtitle = st.text_input("설명 문구", placeholder="예: 성수동 직장인 추천 족발맛집")
+    template_name = st.selectbox("템플릿", list(TEMPLATE_OPTIONS.keys()))
 with col4:
     color_name = st.selectbox("태그 색상", list(COLOR_PRESETS.keys()))
 with col5:
-    template_name = st.selectbox("템플릿", list(TEMPLATE_OPTIONS.keys()))
+    font_name = st.selectbox("폰트", list(FONT_OPTIONS.keys()))
 
 uploaded_file = st.file_uploader("배경 사진 업로드", type=["jpg", "jpeg", "png", "webp"])
 
 accent = COLOR_PRESETS[color_name]
 template = TEMPLATE_OPTIONS[template_name]
+font_family = FONT_OPTIONS[font_name]
+font_css_name = font_family.replace("+", " ")
 
 
-def build_html(img_url, store_name, store_location, subtitle, accent, template, size=540):
+def build_html(img_url, store_name, store_location, subtitle, accent, template, font_id, font_name, size=540):
     scale = size / 540
 
     if template == "modern":
-        return _modern(img_url, store_name, store_location, subtitle, accent, size, scale)
+        return _modern(img_url, store_name, store_location, subtitle, accent, size, scale, font_id, font_name)
     elif template == "center":
-        return _center(img_url, store_name, store_location, subtitle, accent, size, scale)
+        return _center(img_url, store_name, store_location, subtitle, accent, size, scale, font_id, font_name)
     else:
-        return _minimal(img_url, store_name, store_location, subtitle, accent, size, scale)
+        return _minimal(img_url, store_name, store_location, subtitle, accent, size, scale, font_id, font_name)
 
 
-def _modern(img_url, name, loc, sub, accent, sz, sc):
-    tag = f'<div class="tag" style="background:{accent};">{loc}</div>' if loc else ""
+def _modern(img_url, name, loc, sub, accent, sz, sc, fid, fname):
+    is_white = accent.upper() in ("#FFFFFF", "#FFF")
+    tag_style = f"background:{accent};color:{'#222' if is_white else '#fff'};{'border:1.5px solid #ddd;' if is_white else ''}"
+    tag = f'<div class="tag" style="{tag_style}">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family={fid}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent}}
 .card{{
     position:relative;width:{sz}px;height:{sz}px;overflow:hidden;
-    font-family:'Noto Sans KR',sans-serif;border-radius:{int(12*sc)}px;
+    font-family:'{fname}',sans-serif;border-radius:{int(12*sc)}px;
 }}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{
@@ -108,17 +125,20 @@ body{{background:transparent}}
 </div></body></html>"""
 
 
-def _center(img_url, name, loc, sub, accent, sz, sc):
-    tag = f'<div class="tag" style="background:{accent};">{loc}</div>' if loc else ""
+def _center(img_url, name, loc, sub, accent, sz, sc, fid, fname):
+    is_white = accent.upper() in ("#FFFFFF", "#FFF")
+    tag_border = f"border:2px solid {'#ddd' if is_white else accent};"
+    tag_color = f"color:{'#222' if is_white else '#fff'};"
+    tag = f'<div class="tag" style="{tag_border}{tag_color}">{loc}</div>' if loc else ""
     sub_h = f'<p class="sub">{sub}</p>' if sub else ""
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family={fid}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent}}
 .card{{
     position:relative;width:{sz}px;height:{sz}px;overflow:hidden;
-    font-family:'Noto Sans KR',sans-serif;border-radius:{int(12*sc)}px;
+    font-family:'{fname}',sans-serif;border-radius:{int(12*sc)}px;
 }}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .grad{{
@@ -154,17 +174,20 @@ body{{background:transparent}}
 </div></body></html>"""
 
 
-def _minimal(img_url, name, loc, sub, accent, sz, sc):
-    loc_h = f'<span class="loc">{loc}</span><span class="dot">·</span>' if loc else ""
+def _minimal(img_url, name, loc, sub, accent, sz, sc, fid, fname):
+    is_white = accent.upper() in ("#FFFFFF", "#FFF")
+    loc_color = "#333" if is_white else accent
+    loc_h = f'<span class="loc" style="color:{loc_color}">{loc}</span><span class="dot">·</span>' if loc else ""
     sub_h = f'<span class="sub">{sub}</span>' if sub else ""
+    border_color = "#ddd" if is_white else accent
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family={fid}:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent}}
 .card{{
     position:relative;width:{sz}px;height:{sz}px;overflow:hidden;
-    font-family:'Noto Sans KR',sans-serif;border-radius:{int(12*sc)}px;
+    font-family:'{fname}',sans-serif;border-radius:{int(12*sc)}px;
 }}
 .card img{{width:100%;height:100%;object-fit:cover}}
 .bar{{
@@ -172,7 +195,7 @@ body{{background:transparent}}
     background:rgba(0,0,0,0.82);
     backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
     padding:{int(28*sc)}px {int(36*sc)}px;
-    border-top:3px solid {accent};
+    border-top:3px solid {border_color};
 }}
 .name{{
     color:#fff;font-size:{int(30*sc)}px;font-weight:900;
@@ -200,10 +223,10 @@ if uploaded_file and store_name:
     st.divider()
     st.subheader("미리보기")
 
-    preview = build_html(img_url, store_name, store_location, subtitle, accent, template, 540)
+    preview = build_html(img_url, store_name, store_location, subtitle, accent, template, font_family, font_css_name, 540)
     components.html(preview, height=560, scrolling=False)
 
-    download = build_html(img_url, store_name, store_location, subtitle, accent, template, 1080)
+    download = build_html(img_url, store_name, store_location, subtitle, accent, template, font_family, font_css_name, 1080)
 
     st.download_button(
         label="📥 썸네일 다운로드 (HTML → 브라우저에서 스크린샷)",
