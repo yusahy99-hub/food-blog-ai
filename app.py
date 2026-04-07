@@ -15,14 +15,60 @@ if not check_password():
 
 st.markdown("""
 <style>
-    .stMainBlockContainer { max-width: 900px; margin: 0 auto; }
-    .blog-output {
-        background: #fafafa;
-        padding: 2rem;
-        border-radius: 12px;
-        border: 1px solid #eee;
-        line-height: 1.8;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+.stMainBlockContainer { max-width: 780px; margin: 0 auto; }
+
+/* 히어로 섹션 */
+.hero {
+    text-align: center;
+    padding: 2rem 0 1rem;
+}
+.hero h1 {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #FF6B35, #FF4F6F);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.3rem;
+}
+.hero p {
+    color: #888;
+    font-size: 1rem;
+}
+
+/* 섹션 라벨 */
+.section-label {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #FF6B35;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 0.6rem;
+    margin-top: 1.5rem;
+}
+
+/* 블로그 출력 */
+.blog-output {
+    background: #fafafa;
+    padding: 2rem 2.2rem;
+    border-radius: 16px;
+    border: 1px solid #eee;
+    line-height: 2;
+    font-size: 1.02rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+/* 구분선 */
+.styled-divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #ddd, transparent);
+    margin: 2rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -37,26 +83,39 @@ def get_api_key():
     return key
 
 
-# --- 메인 ---
-st.title("✍️ 블로그 글쓰기 AI")
-st.caption("사진을 올리면 맛집 블로거처럼 글을 써드립니다!")
+# --- 히어로 ---
+st.markdown("""
+<div class="hero">
+    <h1>맛집 블로그 글쓰기 AI</h1>
+    <p>사진을 올리면 맛집 블로거처럼 글을 써드립니다</p>
+</div>
+""", unsafe_allow_html=True)
 
+# --- 가게 정보 ---
+st.markdown('<div class="section-label">가게 정보</div>', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    store_name = st.text_input("가게 이름", placeholder="예: 을지로 골목식당")
+    store_name = st.text_input("가게 이름", placeholder="예: 을지로 골목식당", label_visibility="collapsed")
 with col2:
-    store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처")
+    store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처", label_visibility="collapsed")
 
+# --- 글 스타일 ---
+st.markdown('<div class="section-label">글 스타일</div>', unsafe_allow_html=True)
 col3, col4 = st.columns(2)
 with col3:
-    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"])
+    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"],
+                        label_visibility="collapsed")
 with col4:
-    length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"])
+    length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"],
+                          label_visibility="collapsed")
 
+# --- 사진 업로드 ---
+st.markdown('<div class="section-label">사진 업로드</div>', unsafe_allow_html=True)
 uploaded_files = st.file_uploader(
     "음식/공간 사진 업로드",
     type=["jpg", "jpeg", "png", "webp"],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    label_visibility="collapsed"
 )
 
 if uploaded_files:
@@ -65,7 +124,9 @@ if uploaded_files:
         with cols[i % 5]:
             st.image(file, use_container_width=True)
 
-# --- 블로그 생성 ---
+st.markdown("")
+
+# --- 생성 버튼 ---
 if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=True):
     api_key = get_api_key()
     if not api_key:
@@ -139,9 +200,10 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
                     "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 })
 
-                st.divider()
-                st.subheader("📝 생성된 블로그 글")
+                st.markdown('<hr class="styled-divider">', unsafe_allow_html=True)
+                st.markdown("### 📝 생성된 블로그 글")
                 st.markdown(f'<div class="blog-output">{result}</div>', unsafe_allow_html=True)
+                st.markdown("")
                 st.text_area("텍스트 복사용", result, height=200, label_visibility="collapsed")
 
             except Exception as e:
