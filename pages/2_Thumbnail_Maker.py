@@ -1,16 +1,48 @@
 import io
 import os
+import urllib.request
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
-st.set_page_config(page_title="썸네일 만들기", page_icon="🖼️", layout="wide")
+st.set_page_config(page_title="썸네일 만들기", page_icon="🖼️")
+
+st.markdown("""
+<style>
+    .stMainBlockContainer { max-width: 700px; margin: 0 auto; }
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🖼️ 썸네일 만들기")
 st.caption("사진 + 가게 정보를 넣으면 블로그 썸네일을 자동 생성합니다!")
 
-FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "NotoSansKR-Bold.ttf")
+# --- 폰트 다운로드 & 캐싱 ---
+FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf"
+FONT_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".font_cache")
 
-# --- 색상 프리셋 ---
+
+@st.cache_resource
+def get_font_path():
+    """한글 폰트 확보"""
+    # Windows
+    if os.path.exists("C:/Windows/Fonts/malgunbd.ttf"):
+        return "C:/Windows/Fonts/malgunbd.ttf"
+    # 프로젝트 내
+    for p in [
+        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "NotoSansKR-Bold.ttf"),
+    ]:
+        if os.path.exists(p):
+            return p
+    # 다운로드
+    os.makedirs(FONT_CACHE, exist_ok=True)
+    fp = os.path.join(FONT_CACHE, "NotoSansKR-Bold.ttf")
+    if not os.path.exists(fp):
+        urllib.request.urlretrieve(FONT_URL, fp)
+    return fp
+
+
+FONT_PATH = get_font_path()
+
 COLOR_PRESETS = {
     "오렌지": (255, 120, 30),
     "레드": (220, 50, 50),
@@ -22,88 +54,106 @@ COLOR_PRESETS = {
 }
 
 
-def load_font(size):
-    """프로젝트 내장 한글 폰트 로드"""
-    paths = [
-        FONT_PATH,
-        "C:/Windows/Fonts/malgunbd.ttf",
-        "C:/Windows/Fonts/malgun.ttf",
-    ]
-    for fp in paths:
-        try:
-            return ImageFont.truetype(fp, size)
-        except (OSError, IOError):
-            continue
-    return ImageFont.load_default()
+def font(size):
+    try:
+        return ImageFont.truetype(FONT_PATH, size)
+    except (OSError, IOError):
+        return ImageFont.load_default()
 
 
 def create_thumbnail(image, store_name, store_location, subtitle, accent_color):
-    """레퍼런스 스타일 썸네일 - 하단 좌측 배치, 그라데이션"""
-    width, height = 1080, 1080
-    thumb = image.copy().resize((width, height), Image.LANCZOS).convert("RGBA")
+    W, H = 1080, 1080
+    thumb = image.copy().resize((W, H), Image.LANCZOS).convert("RGBA")
 
-    # --- 하단 그라데이션 오버레이 (아래쪽만 어둡게) ---
-    gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    gradient_draw = ImageDraw.Draw(gradient)
-    for y in range(height // 3, height):
-        progress = (y - height // 3) / (height - height // 3)
-        alpha = int(220 * progress)
-        gradient_draw.line([(0, y), (width, y)], fill=(0, 0, 0, alpha))
-    thumb = Image.alpha_composite(thumb, gradient)
+    # --- 하단 그라데이션 ---
+    grad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(grad)
+    start = H // 3
+    for y in range(start, H):
+        a = int(240 * ((y - start) / (H - start)) ** 1.2)
+        gd.line([(0, y), (W, y)], fill=(0, 0, 0, min(a, 240)))
+    thumb = Image.alpha_composite(thumb, grad)
 
     draw = ImageDraw.Draw(thumb)
 
-    # 폰트
-    name_font = load_font(64)
-    subtitle_font = load_font(30)
-    tag_font = load_font(26)
+    name_font = font(78)
+    sub_font = font(32)
+    tag_font = font(26)
 
-    # 좌측 하단 기준
-    margin_left = 60
-    bottom_y = height - 80
+    ml = 65  # margin left
+    bottom = H - 85
 
-    # --- 1. 가게 이름 (맨 아래, 크게) ---
-    name_bbox = draw.textbbox((0, 0), store_name, font=name_font)
-    name_h = name_bbox[3] - name_bbox[1]
-    name_y = bottom_y - name_h
-    draw.text((margin_left + 2, name_y + 2), store_name, fill=(0, 0, 0, 180), font=name_font)
-    draw.text((margin_left, name_y), store_name, fill="white", font=name_font)
+    # === 1. 가게 이름 (맨 아래, 크게) ===
+    max_w = W - ml * 2
+    lines = []
+    cur = ""
+    for ch in store_name:
+        t = cur + ch
+        bb = draw.textbbox((0, 0), t, font=name_font)
+        if bb[2] - bb[0] > max_w and cur:
+            lines.append(cur)
+            cur = ch
+        else:
+            cur = t
+    if cur:
+        lines.append(cur)
 
-    # --- 2. 설명 문구 (가게 이름 위) ---
+    cy = bottom
+    for line in reversed(lines):
+        bb = draw.textbbox((0, 0), line, font=name_font)
+        lh = bb[3] - bb[1]
+        cy -= lh
+        draw.text((ml + 3, cy + 3), line, fill=(0, 0, 0, 200), font=name_font)
+        draw.text((ml, cy), line, fill="white", font=name_font)
+        cy -= 6
+
+    name_top = cy
+
+    # === 2. 설명 문구 (가게 이름 위) ===
     if subtitle:
-        sub_bbox = draw.textbbox((0, 0), subtitle, font=subtitle_font)
-        sub_h = sub_bbox[3] - sub_bbox[1]
-        sub_y = name_y - sub_h - 18
-        draw.text((margin_left + 1, sub_y + 1), subtitle, fill=(0, 0, 0, 150), font=subtitle_font)
-        draw.text((margin_left, sub_y), subtitle, fill="white", font=subtitle_font)
-        tag_bottom = sub_y
+        sb = draw.textbbox((0, 0), subtitle, font=sub_font)
+        sh = sb[3] - sb[1]
+        sy = name_top - sh - 16
+        draw.text((ml + 2, sy + 2), subtitle, fill=(0, 0, 0, 160), font=sub_font)
+        draw.text((ml, sy), subtitle, fill="white", font=sub_font)
+        above = sy
     else:
-        tag_bottom = name_y
+        above = name_top
 
-    # --- 3. 위치 태그 (컬러 박스) ---
+    # === 3. 위치 태그 (컬러 둥근 박스) ===
     if store_location:
-        tag_bbox = draw.textbbox((0, 0), store_location, font=tag_font)
-        tag_w = tag_bbox[2] - tag_bbox[0]
-        tag_h = tag_bbox[3] - tag_bbox[1]
-        tag_pad_x = 20
-        tag_pad_y = 10
-        tag_y = tag_bottom - tag_h - tag_pad_y * 2 - 20
+        tb = draw.textbbox((0, 0), store_location, font=tag_font)
+        tw = tb[2] - tb[0]
+        th = tb[3] - tb[1]
+        px, py = 24, 12
+        ty = above - th - py * 2 - 24
 
-        # 태그 배경
-        text_color = "white" if accent_color != (255, 255, 255) else "black"
+        tc = "white" if accent_color != (255, 255, 255) else "black"
         draw.rounded_rectangle(
-            [margin_left, tag_y,
-             margin_left + tag_w + tag_pad_x * 2, tag_y + tag_h + tag_pad_y * 2],
-            radius=6,
-            fill=(*accent_color, 230)
+            [ml, ty, ml + tw + px * 2, ty + th + py * 2],
+            radius=8, fill=(*accent_color, 240)
         )
-        draw.text((margin_left + tag_pad_x, tag_y + tag_pad_y),
-                  store_location, fill=text_color, font=tag_font)
+        draw.text((ml + px, ty + py), store_location, fill=tc, font=tag_font)
+
+        bracket_top = ty
+    else:
+        bracket_top = above
+
+    # === 4. 꺾쇠 장식 라인 (레퍼런스 스타일) ===
+    line_color = (255, 255, 255, 180)
+    line_w = 3
+    corner_len = 40
+    bx = ml - 20
+    by = bracket_top - 20
+
+    # ㄴ자 위쪽 꺾쇠 (왼쪽 위 코너)
+    draw.line([(bx, by + corner_len), (bx, by)], fill=line_color, width=line_w)
+    draw.line([(bx, by), (bx + corner_len, by)], fill=line_color, width=line_w)
 
     return thumb.convert("RGB")
 
 
-# --- 입력 ---
+# --- UI ---
 col1, col2 = st.columns(2)
 with col1:
     store_name = st.text_input("가게 이름", placeholder="예: 광장족발")
@@ -119,9 +169,8 @@ with col4:
 uploaded_file = st.file_uploader("배경 사진 업로드", type=["jpg", "jpeg", "png", "webp"])
 
 if uploaded_file:
-    st.image(uploaded_file, caption="원본 사진", use_container_width=True)
+    st.image(uploaded_file, caption="원본 사진", width=350)
 
-# --- 생성 ---
 if st.button("🖼️ 썸네일 생성", type="primary", use_container_width=True):
     if not store_name:
         st.error("가게 이름을 입력해주세요.")
@@ -131,14 +180,12 @@ if st.button("🖼️ 썸네일 생성", type="primary", use_container_width=Tru
         uploaded_file.seek(0)
         image = Image.open(uploaded_file)
         accent = COLOR_PRESETS[color_name]
-
         thumbnail = create_thumbnail(image, store_name, store_location, subtitle, accent)
 
         st.divider()
         st.subheader("완성된 썸네일")
         st.image(thumbnail, use_container_width=True)
 
-        # 다운로드
         buf = io.BytesIO()
         thumbnail.save(buf, format="JPEG", quality=95)
         st.download_button(
