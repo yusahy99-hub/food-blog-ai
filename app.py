@@ -52,7 +52,7 @@ with col2:
     store_location = st.text_input("위치", placeholder="예: 서울 을지로3가역 근처")
 
 uploaded_files = st.file_uploader(
-    "음식/공간 사진 업로드",
+    "음식/공간 사진 업로드 (최대 5장)",
     type=["jpg", "jpeg", "png", "webp"],
     accept_multiple_files=True
 )
@@ -70,12 +70,14 @@ if st.button("✍️ 블로그 글 생성", type="primary", use_container_width=
         st.error("사이드바에서 API Key를 입력해주세요.")
     elif not uploaded_files:
         st.error("사진을 최소 1장 업로드해주세요.")
+    elif len(uploaded_files) > 5:
+        st.error("사진은 최대 5장까지 업로드 가능합니다.")
     elif not store_name:
         st.error("가게 이름을 입력해주세요.")
     else:
         # 이미지를 base64로 변환
         image_contents = []
-        for file in uploaded_files:
+        for file in uploaded_files[:5]:
             file.seek(0)
             data = base64.standard_b64encode(file.read()).decode("utf-8")
             media_type = file.type or "image/jpeg"
