@@ -1,7 +1,7 @@
 import os
 import base64
 import streamlit as st
-from groq import Groq
+import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,11 +12,16 @@ st.markdown('<style>.stMainBlockContainer{max-width:720px;margin:0 auto}</style>
 st.title("📱 인스타 캡션 생성기")
 st.caption("사진 올리면 인스타 감성 캡션을 바로 만들어줍니다")
 
-default_key = os.environ.get("GROQ_API_KEY", "")
-try:
-    default_key = default_key or st.secrets.get("GROQ_API_KEY", "")
-except Exception:
-    pass
+
+def get_api_key():
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        try:
+            key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        except Exception:
+            pass
+    return key
+
 
 STYLES = {
     "감성적": "감성적이고 서정적인 톤. 짧은 문장, 여운 있게.",
@@ -44,7 +49,8 @@ if uploaded:
     st.image(uploaded, width=350)
 
 if st.button("📱 캡션 생성", type="primary", use_container_width=True):
-    if not default_key:
+    api_key = get_api_key()
+    if not api_key:
         st.error("API Key가 설정되지 않았습니다.")
     elif not uploaded:
         st.error("사진을 업로드해주세요.")
@@ -69,19 +75,19 @@ if st.button("📱 캡션 생성", type="primary", use_container_width=True):
 """
 
         content = [
-            {"type": "image_url", "image_url": {"url": f"data:{uploaded.type};base64,{data}"}},
-            {"type": "text", "text": prompt}
+            {"type": "image", "source": {"type": "base64", "media_type": uploaded.type, "data": data}},
+            {"type": "text", "text": prompt},
         ]
 
         with st.spinner("캡션 생성 중..."):
             try:
-                client = Groq(api_key=default_key)
-                resp = client.chat.completions.create(
-                    model="meta-llama/llama-4-scout-17b-16e-instruct",
-                    messages=[{"role": "user", "content": content}],
+                client = anthropic.Anthropic(api_key=api_key)
+                response = client.messages.create(
+                    model="claude-sonnet-4-6",
                     max_tokens=3000,
+                    messages=[{"role": "user", "content": content}],
                 )
-                result = resp.choices[0].message.content
+                result = response.content[0].text
                 st.divider()
                 st.markdown(result)
                 st.text_area("복사용", result, height=300, label_visibility="collapsed")
