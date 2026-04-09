@@ -31,50 +31,88 @@ TEMPLATES = {
     "시네마틱": "cinematic", "타이포": "typo",
 }
 
-# --- 폰트 로드 ---
-def _find_font():
-    """한글 폰트 경로 탐색 (캐시 없이 매번 확인)"""
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    candidates = [
-        # Linux 시스템 폰트 (packages.txt로 설치됨) - 최우선
+# --- 폰트 ---
+FONT_OPTIONS = {
+    "Noto Sans KR (고딕)": "NotoSansKR-Bold.ttf",
+    "Noto Serif KR (명조)": "NotoSerifKR-Bold.ttf",
+    "Black Han Sans (굵은 제목)": "BlackHanSans-Regular.ttf",
+    "Jua (둥근 고딕)": "Jua-Regular.ttf",
+    "Do Hyeon (네모 고딕)": "DoHyeon-Regular.ttf",
+    "Gaegu (손글씨)": "Gaegu-Bold.ttf",
+    "Gowun Batang (바탕)": "GowunBatang-Bold.ttf",
+    "Gothic A1 (모던 고딕)": "GothicA1-Bold.ttf",
+    "Nanum Myeongjo (나눔명조)": "NanumMyeongjo-Bold.ttf",
+}
+
+FONT_URLS = {
+    "NotoSansKR-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf",
+    "NotoSerifKR-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/notoserifkr/NotoSerifKR-Bold.ttf",
+    "BlackHanSans-Regular.ttf": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+    "Jua-Regular.ttf": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
+    "DoHyeon-Regular.ttf": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
+    "Gaegu-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/gaegu/Gaegu-Bold.ttf",
+    "GowunBatang-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/gowunbatang/GowunBatang-Bold.ttf",
+    "GothicA1-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Bold.ttf",
+    "NanumMyeongjo-Bold.ttf": "https://github.com/google/fonts/raw/main/ofl/nanummyeongjo/NanumMyeongjo-Bold.ttf",
+}
+
+import tempfile
+FONT_CACHE_DIR = os.path.join(tempfile.gettempdir(), "food_blog_fonts")
+os.makedirs(FONT_CACHE_DIR, exist_ok=True)
+
+# 프로젝트 로컬 기본 폰트 (NotoSansKR)
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_local_noto = os.path.join(_project_root, "fonts", "NotoSansKR-Bold.ttf")
+
+
+def _get_font_path(font_file):
+    """폰트 파일 경로 반환. 없으면 다운로드."""
+    # 로컬 NotoSansKR은 프로젝트에 포함되어 있음
+    if font_file == "NotoSansKR-Bold.ttf":
+        if os.path.exists(_local_noto):
+            return _local_noto
+        cwd_path = os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf")
+        if os.path.exists(cwd_path):
+            return cwd_path
+
+    # 캐시 확인
+    cached = os.path.join(FONT_CACHE_DIR, font_file)
+    if os.path.exists(cached):
+        return cached
+
+    # 다운로드
+    url = FONT_URLS.get(font_file)
+    if url:
+        try:
+            urllib.request.urlretrieve(url, cached)
+            return cached
+        except Exception:
+            pass
+
+    # 최종 폴백: 시스템 폰트 또는 프로젝트 폰트
+    for p in [
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
-        # 프로젝트 로컬 폰트
-        os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
-        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
-        # Windows
-        "C:/Windows/Fonts/malgunbd.ttf",
-        "C:/Windows/Fonts/malgun.ttf",
-    ]
-    for p in candidates:
+        _local_noto,
+    ]:
         if os.path.exists(p):
             return p
 
-    # glob 폴백
     found = glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
-    if found:
-        return found[0]
-    found = glob.glob("/usr/share/fonts/**/Noto*KR*", recursive=True)
-    if found:
-        return found[0]
+    return found[0] if found else None
 
-    # 다운로드 최후 수단
-    import tempfile
-    fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
-    if not os.path.exists(fp):
-        urllib.request.urlretrieve(
-            "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
-    return fp
 
-FONT_PATH = _find_font()
-
-def font(size, weight="bold"):
+def font(size, font_file="NotoSansKR-Bold.ttf"):
+    path = _get_font_path(font_file)
+    if not path:
+        st.warning("한글 폰트를 찾을 수 없습니다.")
+        return ImageFont.load_default()
     try:
-        if FONT_PATH.endswith(".ttc"):
-            return ImageFont.truetype(FONT_PATH, size, index=0)
-        return ImageFont.truetype(FONT_PATH, size)
+        if path.endswith(".ttc"):
+            return ImageFont.truetype(path, size, index=0)
+        return ImageFont.truetype(path, size)
     except (OSError, IOError) as e:
-        st.warning(f"폰트 로드 실패: {FONT_PATH} → {e}")
+        st.warning(f"폰트 로드 실패: {path} → {e}")
         return ImageFont.load_default()
 
 def hex_rgb(h):
@@ -113,13 +151,13 @@ col3, col4 = st.columns(2)
 with col3:
     template_name = st.selectbox("템플릿", list(TEMPLATES.keys()))
 with col4:
-    color_name = st.selectbox("태그 색상", list(COLOR_PRESETS.keys()))
+    font_name = st.selectbox("폰트", list(FONT_OPTIONS.keys()))
 
 col5, col6 = st.columns(2)
 with col5:
-    text_color_name = st.selectbox("글씨 색상", list(TEXT_COLORS.keys()))
+    color_name = st.selectbox("태그 색상", list(COLOR_PRESETS.keys()))
 with col6:
-    font_weight = st.selectbox("글씨 굵기", ["보통", "굵게"])
+    text_color_name = st.selectbox("글씨 색상", list(TEXT_COLORS.keys()))
 
 with st.expander("글자 크기 설정"):
     sc1, sc2, sc3 = st.columns(3)
@@ -154,6 +192,7 @@ tc = hex_rgb(TEXT_COLORS[text_color_name])
 tc_a = lambda a: (*tc, a)
 ac_a = lambda a: (*accent, a)
 is_white_accent = COLOR_PRESETS[color_name].upper() in ("#FFFFFF", "#FFF")
+selected_font_file = FONT_OPTIONS[font_name]
 S = {"name": name_size * 2, "sub": sub_size * 2, "tag": tag_size * 2}
 
 
@@ -183,10 +222,9 @@ def render_thumbnail(pil_img):
         img = bg
 
     draw = ImageDraw.Draw(img)
-    fw = "regular" if font_weight == "보통" else "bold"
-    nf = font(S["name"], fw)
-    sf = font(S["sub"], fw)
-    tf = font(S["tag"], fw)
+    nf = font(S["name"], selected_font_file)
+    sf = font(S["sub"], selected_font_file)
+    tf = font(S["tag"], selected_font_file)
     ml = 80
 
     name = store_name
