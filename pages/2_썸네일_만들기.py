@@ -33,38 +33,58 @@ TEMPLATES = {
 
 # --- 폰트 로드 ---
 @st.cache_resource
-def load_font_path():
-    # .ttf 우선 (한글 확실 지원)
-    ttf_candidates = [
+def load_font_paths():
+    """Bold/Regular 폰트 경로를 각각 반환"""
+    bold_candidates = [
         "C:/Windows/Fonts/malgunbd.ttf",
-        "C:/Windows/Fonts/malgun.ttf",
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
-    for p in ttf_candidates:
+    regular_candidates = [
+        "C:/Windows/Fonts/malgun.ttf",
+        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),  # Regular 없으면 Bold 대체
+    ]
+
+    bold_path = None
+    for p in bold_candidates:
         if os.path.exists(p):
-            return p
+            bold_path = p
+            break
 
-    # .ttc는 인덱스 필요 - 별도 처리
-    ttc_candidates = glob.glob("/usr/share/fonts/**/Noto*CJK*.ttc", recursive=True)
-    if ttc_candidates:
-        return ttc_candidates[0]
+    regular_path = None
+    for p in regular_candidates:
+        if os.path.exists(p):
+            regular_path = p
+            break
 
-    # 다운로드
-    import tempfile
-    fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
-    if not os.path.exists(fp):
-        urllib.request.urlretrieve(
-            "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
-    return fp
+    # .ttc 폴백 (Linux)
+    if not bold_path:
+        ttc = glob.glob("/usr/share/fonts/**/Noto*CJK*.ttc", recursive=True)
+        if ttc:
+            bold_path = ttc[0]
 
-FONT_PATH = load_font_path()
+    # 다운로드 폴백
+    if not bold_path:
+        import tempfile
+        fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
+        if not os.path.exists(fp):
+            urllib.request.urlretrieve(
+                "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
+        bold_path = fp
 
-def font(size):
+    if not regular_path:
+        regular_path = bold_path
+
+    return {"bold": bold_path, "regular": regular_path}
+
+FONT_PATHS = load_font_paths()
+
+def font(size, weight="bold"):
+    path = FONT_PATHS[weight] if weight in FONT_PATHS else FONT_PATHS["bold"]
     try:
-        if FONT_PATH.endswith(".ttc"):
-            return ImageFont.truetype(FONT_PATH, size, index=0)
-        return ImageFont.truetype(FONT_PATH, size)
-    except:
+        if path.endswith(".ttc"):
+            return ImageFont.truetype(path, size, index=0)
+        return ImageFont.truetype(path, size)
+    except (OSError, IOError):
         return ImageFont.load_default()
 
 def hex_rgb(h):
@@ -173,9 +193,10 @@ def render_thumbnail(pil_img):
         img = bg
 
     draw = ImageDraw.Draw(img)
-    nf = font(S["name"])
-    sf = font(S["sub"])
-    tf = font(S["tag"])
+    fw = "regular" if font_weight == "보통" else "bold"
+    nf = font(S["name"], fw)
+    sf = font(S["sub"], fw)
+    tf = font(S["tag"], fw)
     ml = 80
 
     name = store_name

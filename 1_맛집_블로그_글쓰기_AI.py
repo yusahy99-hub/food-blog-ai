@@ -102,7 +102,7 @@ with col2:
 st.markdown('<div class="section-label">글 스타일</div>', unsafe_allow_html=True)
 col3, col4 = st.columns(2)
 with col3:
-    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한"],
+    tone = st.selectbox("톤 선택", ["친근하고 캐주얼한", "감성적이고 세련된", "유머러스한", "정보 중심의 깔끔한", "먹방 유튜버 스타일의", "솔직담백한 현실 리뷰", "MZ세대 감성의", "프로 미식가 스타일의"],
                         label_visibility="collapsed")
 with col4:
     length = st.selectbox("글 길이", ["짧게 (SNS용)", "보통 (블로그용)", "길게 (상세 리뷰)"],

@@ -73,7 +73,10 @@ def add_watermark(img, text, pos, opacity_pct, size_pct):
     font_size = max(int(w * size_pct / 100), 16)
 
     try:
-        font = ImageFont.truetype(FONT_PATH, font_size)
+        if FONT_PATH.endswith(".ttc"):
+            font = ImageFont.truetype(FONT_PATH, font_size, index=0)
+        else:
+            font = ImageFont.truetype(FONT_PATH, font_size)
     except (OSError, IOError):
         font = ImageFont.load_default()
 
