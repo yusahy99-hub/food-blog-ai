@@ -22,7 +22,9 @@ FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-B
 def get_font_path():
     if os.path.exists("C:/Windows/Fonts/malgunbd.ttf"):
         return "C:/Windows/Fonts/malgunbd.ttf"
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for p in [
+        os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     ]:

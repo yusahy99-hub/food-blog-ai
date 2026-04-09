@@ -35,13 +35,17 @@ TEMPLATES = {
 @st.cache_resource
 def load_font_paths():
     """Bold/Regular 폰트 경로를 각각 반환"""
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_font = os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf")
     bold_candidates = [
         "C:/Windows/Fonts/malgunbd.ttf",
+        local_font,
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
     regular_candidates = [
         "C:/Windows/Fonts/malgun.ttf",
-        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),  # Regular 없으면 Bold 대체
+        local_font,
+        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
 
     bold_path = None

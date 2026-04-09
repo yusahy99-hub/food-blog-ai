@@ -29,8 +29,10 @@ THEMES = {
 # --- 폰트 로드 ---
 @st.cache_resource
 def load_font_path():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
         "C:/Windows/Fonts/malgunbd.ttf",
+        os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
     for p in candidates:
