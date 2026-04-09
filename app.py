@@ -2,10 +2,6 @@ import streamlit as st
 
 st.set_page_config(page_title="맛집 블로그 글쓰기 AI", page_icon="✍️", layout="wide")
 
-from auth import check_password
-if not check_password():
-    st.stop()
-
 pg = st.navigation([
     st.Page("1_맛집_블로그_글쓰기_AI.py", title="맛집 블로그 글쓰기 AI", icon="✍️", default=True),
     st.Page("pages/2_썸네일_만들기.py", title="썸네일 만들기", icon="🖼️"),
@@ -21,4 +17,9 @@ pg = st.navigation([
     st.Page("pages/12_글_히스토리.py", title="글 히스토리", icon="📚"),
     st.Page("pages/14_캐러셀_만들기.py", title="캐러셀 만들기", icon="📱"),
 ])
+
+from auth import check_password
+if not check_password():
+    st.stop()
+
 pg.run()
