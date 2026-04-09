@@ -2,11 +2,6 @@ import urllib.parse
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="지도 링크", page_icon="📍")
-
-from auth import check_password
-if not check_password():
-    st.stop()
 
 st.markdown("""
 <style>

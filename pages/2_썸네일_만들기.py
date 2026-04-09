@@ -5,11 +5,6 @@ import urllib.request
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
-st.set_page_config(page_title="썸네일 만들기", page_icon="🖼️")
-
-from auth import check_password
-if not check_password():
-    st.stop()
 
 st.markdown("""
 <style>

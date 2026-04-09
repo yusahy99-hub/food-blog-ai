@@ -3,11 +3,6 @@ import zipfile
 import streamlit as st
 from PIL import Image, ImageEnhance, ImageFilter
 
-st.set_page_config(page_title="사진 보정", page_icon="🎨")
-
-from auth import check_password
-if not check_password():
-    st.stop()
 
 st.markdown('<style>.stMainBlockContainer{max-width:800px;margin:0 auto}</style>', unsafe_allow_html=True)
 

@@ -4,11 +4,6 @@ import zipfile
 import streamlit as st
 from PIL import Image
 
-st.set_page_config(page_title="캐러셀 만들기", page_icon="📱")
-
-from auth import check_password
-if not check_password():
-    st.stop()
 
 st.markdown("""
 <style>
