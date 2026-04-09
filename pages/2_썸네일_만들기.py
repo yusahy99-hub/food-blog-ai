@@ -32,63 +32,49 @@ TEMPLATES = {
 }
 
 # --- 폰트 로드 ---
-@st.cache_resource
-def load_font_paths():
-    """Bold/Regular 폰트 경로를 각각 반환"""
+def _find_font():
+    """한글 폰트 경로 탐색 (캐시 없이 매번 확인)"""
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    local_font = os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf")
-    bold_candidates = [
+    candidates = [
+        # Linux 시스템 폰트 (packages.txt로 설치됨) - 최우선
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+        # 프로젝트 로컬 폰트
+        os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
+        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
+        # Windows
         "C:/Windows/Fonts/malgunbd.ttf",
-        local_font,
-        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
-    ]
-    regular_candidates = [
         "C:/Windows/Fonts/malgun.ttf",
-        local_font,
-        os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
     ]
-
-    bold_path = None
-    for p in bold_candidates:
+    for p in candidates:
         if os.path.exists(p):
-            bold_path = p
-            break
+            return p
 
-    regular_path = None
-    for p in regular_candidates:
-        if os.path.exists(p):
-            regular_path = p
-            break
+    # glob 폴백
+    found = glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    if found:
+        return found[0]
+    found = glob.glob("/usr/share/fonts/**/Noto*KR*", recursive=True)
+    if found:
+        return found[0]
 
-    # .ttc 폴백 (Linux)
-    if not bold_path:
-        ttc = glob.glob("/usr/share/fonts/**/Noto*CJK*.ttc", recursive=True)
-        if ttc:
-            bold_path = ttc[0]
+    # 다운로드 최후 수단
+    import tempfile
+    fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
+    if not os.path.exists(fp):
+        urllib.request.urlretrieve(
+            "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
+    return fp
 
-    # 다운로드 폴백
-    if not bold_path:
-        import tempfile
-        fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
-        if not os.path.exists(fp):
-            urllib.request.urlretrieve(
-                "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
-        bold_path = fp
-
-    if not regular_path:
-        regular_path = bold_path
-
-    return {"bold": bold_path, "regular": regular_path}
-
-FONT_PATHS = load_font_paths()
+FONT_PATH = _find_font()
 
 def font(size, weight="bold"):
-    path = FONT_PATHS[weight] if weight in FONT_PATHS else FONT_PATHS["bold"]
     try:
-        if path.endswith(".ttc"):
-            return ImageFont.truetype(path, size, index=0)
-        return ImageFont.truetype(path, size)
-    except (OSError, IOError):
+        if FONT_PATH.endswith(".ttc"):
+            return ImageFont.truetype(FONT_PATH, size, index=0)
+        return ImageFont.truetype(FONT_PATH, size)
+    except (OSError, IOError) as e:
+        st.warning(f"폰트 로드 실패: {FONT_PATH} → {e}")
         return ImageFont.load_default()
 
 def hex_rgb(h):

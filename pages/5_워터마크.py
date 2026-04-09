@@ -18,20 +18,23 @@ st.caption("사진에 블로그명/인스타 아이디 워터마크를 넣어줍
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf"
 
 
-@st.cache_resource
-def get_font_path():
-    if os.path.exists("C:/Windows/Fonts/malgunbd.ttf"):
-        return "C:/Windows/Fonts/malgunbd.ttf"
+def _find_font():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    for p in [
+    candidates = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
         os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-    ]:
+        "C:/Windows/Fonts/malgunbd.ttf",
+    ]
+    for p in candidates:
         if os.path.exists(p):
             return p
     import glob
     found = glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    if found:
+        return found[0]
+    found = glob.glob("/usr/share/fonts/**/Noto*KR*", recursive=True)
     if found:
         return found[0]
     import tempfile
@@ -41,7 +44,7 @@ def get_font_path():
     return fp
 
 
-FONT_PATH = get_font_path()
+FONT_PATH = _find_font()
 
 POSITIONS = {
     "우하단": "br",

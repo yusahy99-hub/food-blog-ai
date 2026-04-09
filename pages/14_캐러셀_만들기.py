@@ -27,20 +27,24 @@ THEMES = {
 }
 
 # --- 폰트 로드 ---
-@st.cache_resource
-def load_font_path():
+def _find_font():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
-        "C:/Windows/Fonts/malgunbd.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
         os.path.join(project_root, "fonts", "NotoSansKR-Bold.ttf"),
         os.path.join(os.getcwd(), "fonts", "NotoSansKR-Bold.ttf"),
+        "C:/Windows/Fonts/malgunbd.ttf",
     ]
     for p in candidates:
         if os.path.exists(p):
             return p
-    ttc = glob.glob("/usr/share/fonts/**/Noto*CJK*.ttc", recursive=True)
-    if ttc:
-        return ttc[0]
+    found = glob.glob("/usr/share/fonts/**/Noto*CJK*", recursive=True)
+    if found:
+        return found[0]
+    found = glob.glob("/usr/share/fonts/**/Noto*KR*", recursive=True)
+    if found:
+        return found[0]
     import tempfile
     fp = os.path.join(tempfile.gettempdir(), "NotoSansKR-Bold.ttf")
     if not os.path.exists(fp):
@@ -48,7 +52,7 @@ def load_font_path():
             "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf", fp)
     return fp
 
-FONT_PATH = load_font_path()
+FONT_PATH = _find_font()
 
 
 def get_font(size):
